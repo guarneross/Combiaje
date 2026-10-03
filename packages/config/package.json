@@ -1,0 +1,11 @@
+{
+  "name": "@combiaje/config",
+  "version": "0.0.0",
+  "private": true,
+  "files": ["tsconfig", "eslint.base.mjs"],
+  "exports": {
+    "./eslint": "./eslint.base.mjs",
+    "./tsconfig/base": "./tsconfig/base.json",
+    "./tsconfig/nextjs": "./tsconfig/nextjs.json"
+  }
+}

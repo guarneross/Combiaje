@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Combiaje — tokens de color
+   Paleta sobria a propósito: el color de las rutas lo asigna el backend y es
+   lo único que debe gritar en pantalla. La interfaz se queda atrás.
+   Primario: azul cobalto, guiño a la talavera poblana.
+   Todo en oklch para que el modo oscuro no se vea lavado.
+--------------------------------------------------------------------------- */
+
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.21 0.02 258);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 258);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 258);
+
+  --primary: oklch(0.48 0.17 264);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.96 0.01 258);
+  --secondary-foreground: oklch(0.28 0.03 258);
+
+  --muted: oklch(0.96 0.01 258);
+  --muted-foreground: oklch(0.52 0.02 258);
+
+  --accent: oklch(0.95 0.03 264);
+  --accent-foreground: oklch(0.34 0.09 264);
+
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --success: oklch(0.56 0.14 152);
+  --success-foreground: oklch(0.99 0 0);
+
+  --border: oklch(0.91 0.01 258);
+  --input: oklch(0.91 0.01 258);
+  --ring: oklch(0.48 0.17 264);
+
+  /* Mapa: halo del trazo de ruta. Claro sobre calles claras. */
+  --map-halo: oklch(1 0 0);
+  --map-surface: oklch(0.97 0.005 258);
+  /* Sombra de los paneles que flotan sobre el mapa. */
+  --map-overlay-shadow: 0 -1px 24px -4px oklch(0.21 0.02 258 / 0.18);
+}
+
+.dark {
+  --background: oklch(0.17 0.015 258);
+  --foreground: oklch(0.97 0.005 258);
+
+  --card: oklch(0.22 0.018 258);
+  --card-foreground: oklch(0.97 0.005 258);
+  --popover: oklch(0.22 0.018 258);
+  --popover-foreground: oklch(0.97 0.005 258);
+
+  --primary: oklch(0.74 0.14 264);
+  --primary-foreground: oklch(0.19 0.04 264);
+
+  --secondary: oklch(0.27 0.02 258);
+  --secondary-foreground: oklch(0.97 0.005 258);
+
+  --muted: oklch(0.27 0.02 258);
+  --muted-foreground: oklch(0.71 0.015 258);
+
+  --accent: oklch(0.31 0.045 264);
+  --accent-foreground: oklch(0.93 0.03 264);
+
+  --destructive: oklch(0.67 0.19 24);
+  --destructive-foreground: oklch(0.16 0.03 24);
+
+  --success: oklch(0.72 0.15 154);
+  --success-foreground: oklch(0.18 0.04 154);
+
+  --border: oklch(0.98 0 0 / 12%);
+  --input: oklch(0.98 0 0 / 16%);
+  --ring: oklch(0.74 0.14 264);
+
+  /* Mapa: halo oscuro para que el trazo se siga viendo sobre calles oscuras. */
+  --map-halo: oklch(0.15 0.015 258);
+  --map-surface: oklch(0.2 0.015 258);
+  --map-overlay-shadow: 0 -1px 24px -4px oklch(0 0 0 / 0.55);
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-map-halo: var(--map-halo);
+  --color-map-surface: var(--map-surface);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before {
+    @apply border-border;
+  }
+
+  html {
+    /* La hoja inferior arrastrable y el mapa pelean con el rebote del scroll
+       del navegador. Esto lo apaga de raíz. */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Distancias y calificaciones en cifras de ancho fijo: una lista de
+     "320 m / 1.2 km" no debe bailar al actualizarse. */
+  .tabular,
+  [data-slot="distance"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Accesibilidad AA: el foco siempre se ve, también sobre el mapa. */
+  :focus-visible {
+    @apply ring-ring ring-offset-background outline-none ring-2 ring-offset-2;
+  }
+
+  ::selection {
+    @apply bg-primary/20;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Utilidades de área segura. El mapa va a pantalla completa, así que los
+   controles tienen que respetar la barra de gestos y el notch.
+--------------------------------------------------------------------------- */
+
+@utility pt-safe {
+  padding-top: max(env(safe-area-inset-top, 0px), var(--tw-pt-safe-min, 0px));
+}
+
+@utility pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--tw-pb-safe-min, 0px));
+}
+
+@utility px-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+@utility mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility top-safe {
+  top: env(safe-area-inset-top, 0px);
+}
+
+@utility bottom-safe {
+  bottom: env(safe-area-inset-bottom, 0px);
+}
