@@ -15,7 +15,21 @@ export async function register() {
   // Solo en el entorno de Node. En el Edge Runtime no hay `msw/node`.
   if (process.env["NEXT_RUNTIME"] !== "nodejs") return;
 
-  const { server } = await import("./mocks/server");
-  server.listen({ onUnhandledFrame: "bypass" });
-  console.warn("[combiaje] MSW activo en el servidor: los datos son simulados.");
+  // Si esto falla, Next no arranca el servidor y **todo el sitio responde 500**.
+  // Pasó en el primer despliegue: `@mswjs/interceptors` lee un `.wasm` que el
+  // empaquetado dejó apuntando a la carpeta de compilación, que en Hostinger
+  // desaparece al publicar. Se arregló marcando msw como paquete externo (ver
+  // `next.config.ts`), pero la capa de datos simulados no merece poder tirar el
+  // sitio: si vuelve a fallar, que se caigan los datos, no el servidor.
+  try {
+    const { server } = await import("./mocks/server");
+    server.listen({ onUnhandledFrame: "bypass" });
+    console.warn("[combiaje] MSW activo en el servidor: los datos son simulados.");
+  } catch (error) {
+    console.error(
+      "[combiaje] No se pudo arrancar MSW en el servidor. El sitio sigue en pie, " +
+        "pero las páginas renderizadas en servidor van a mostrar su estado de error.",
+      error,
+    );
+  }
 }

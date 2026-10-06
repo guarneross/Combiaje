@@ -17,6 +17,18 @@ const nextConfig: NextConfig = {
   // packages/shared se publica como TypeScript sin compilar.
   transpilePackages: ["@combiaje/shared"],
 
+  // MSW se deja FUERA del empaquetado del servidor.
+  //
+  // `@mswjs/interceptors` lee un archivo `.wasm` con `readFileSync`. Al
+  // empaquetarlo, esa lectura queda con la ruta absoluta de la carpeta donde
+  // se compiló, y el despliegue de Hostinger publica el build en otra carpeta
+  // (`hbuilds/versions/<id>/`): el archivo ya no está ahí y el servidor no
+  // arranca —500 en todo el sitio—. Marcándolo como externo, Next lo copia
+  // dentro de `standalone/node_modules` y lo carga en tiempo de ejecución.
+  //
+  // Esto desaparece el día que `NEXT_PUBLIC_ENABLE_MOCKS` sea `false`.
+  serverExternalPackages: ["msw", "@mswjs/interceptors"],
+
   // Un build que pasa con errores de tipo es un build que miente.
   // (En Next 16 el lint ya no corre dentro de `next build`: va en CI, por
   //  `pnpm lint`. Eso lo cuida el chat de QA/DevOps.)

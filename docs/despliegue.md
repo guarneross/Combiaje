@@ -71,6 +71,43 @@ arma distinto en tu máquina y en el servidor es una fuente de errores que solo
 aparecen en producción. `pnpm dev` sigue con Turbopack, que es donde la
 velocidad importa.
 
+### ⚠️ MSW tiene que quedar fuera del empaquetado del servidor
+
+`@mswjs/interceptors` lee un archivo `.wasm` con `readFileSync`. Si se empaqueta
+dentro de los chunks del servidor, esa lectura queda con **la ruta absoluta de
+la carpeta donde se compiló**. Hostinger compila en
+`hbuilds/source/repository/` y publica en `hbuilds/versions/<id>/`: el archivo
+ya no está ahí, `instrumentation.js` revienta, Next no termina de arrancar y
+**todo el sitio responde 500**.
+
+```
+Failed to prepare server Error: An error occurred while loading instrumentation
+hook: ENOENT: no such file or directory, open
+'.../hbuilds/source/repository/node_modules/.pnpm/@mswjs+interceptors@0.45.6/
+ node_modules/@mswjs/interceptors/lib/node/llhttp/llhttp.wasm'
+```
+
+La solución son dos líneas en `next.config.ts`:
+
+```ts
+serverExternalPackages: ["msw", "@mswjs/interceptors"],
+```
+
+Así Next no lo empaqueta: lo copia dentro de `standalone/node_modules` y lo
+carga en tiempo de ejecución, con rutas relativas a su propia carpeta.
+
+Además, `instrumentation.ts` envuelve el arranque de MSW en un `try/catch`: la
+capa de datos simulados no debería poder tirar el sitio entero.
+
+**Cómo comprobarlo antes de desplegar**: copia `.next/standalone` a otra ruta y
+arráncalo desde ahí. Si funciona movido, funciona publicado.
+
+```bash
+cp -r apps/web/.next/standalone /tmp/prueba
+cd /tmp/prueba && NEXT_PUBLIC_API_URL=http://127.0.0.1:3110 PORT=3110 \
+  NEXT_PUBLIC_ENABLE_MOCKS=true node apps/web/server.js
+```
+
 ### ⚠️ El detalle que rompe todos los despliegues standalone
 
 Next **no copia** `public/` ni `.next/static/` dentro de `.next/standalone`.
