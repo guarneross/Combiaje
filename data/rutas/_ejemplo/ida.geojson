@@ -1,0 +1,18 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "nota": "Puntos de paso, no el trazo final. El script los pega a las calles." },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-98.1983, 19.0433],
+          [-98.1850, 19.0400],
+          [-98.1700, 19.0370],
+          [-98.1480, 19.0330]
+        ]
+      }
+    }
+  ]
+}

@@ -12,13 +12,13 @@ posterior: es un requisito del producto.
 
 De ahí salen presupuestos derivados que conviene vigilar bloque a bloque:
 
-| Métrica | Presupuesto | Por qué |
-|---|---|---|
-| `load` en 4G lenta | < 3 000 ms | Requisito del hito |
-| LCP | < 2 500 ms | Umbral «bueno» de Core Web Vitals |
-| Transferencia inicial | < 600 KB | Datos móviles limitados y de prepago |
-| Peticiones iniciales | < 35 | Cada ida y vuelta cuesta 150 ms de RTT |
-| Cuadros por segundo del mapa | ≥ 50 fps en gama media | Un mapa a 20 fps se siente roto |
+| Métrica                      | Presupuesto            | Por qué                                |
+| ---------------------------- | ---------------------- | -------------------------------------- |
+| `load` en 4G lenta           | < 3 000 ms             | Requisito del hito                     |
+| LCP                          | < 2 500 ms             | Umbral «bueno» de Core Web Vitals      |
+| Transferencia inicial        | < 600 KB               | Datos móviles limitados y de prepago   |
+| Peticiones iniciales         | < 35                   | Cada ida y vuelta cuesta 150 ms de RTT |
+| Cuadros por segundo del mapa | ≥ 50 fps en gama media | Un mapa a 20 fps se siente roto        |
 
 Regla de trabajo: **si un cambio empeora el presupuesto, hay que decirlo en la
 descripción del PR**, aunque siga dentro del límite. Lo que mata el
@@ -40,13 +40,13 @@ cd apps/web && PORT=3100 pnpm start
 Y encima, un navegador real con la red y la CPU frenadas a mano. Las
 condiciones son las de «4G lenta» de Lighthouse:
 
-| Parámetro | Valor |
-|---|---|
-| Bajada | 1.6 Mbps |
-| Subida | 750 Kbps |
-| Latencia (RTT) | 150 ms |
-| CPU | 4× más lenta (emula gama media) |
-| Viewport | 360 × 740, `deviceScaleFactor` 2 |
+| Parámetro      | Valor                            |
+| -------------- | -------------------------------- |
+| Bajada         | 1.6 Mbps                         |
+| Subida         | 750 Kbps                         |
+| Latencia (RTT) | 150 ms                           |
+| CPU            | 4× más lenta (emula gama media)  |
+| Viewport       | 360 × 740, `deviceScaleFactor` 2 |
 
 Con Playwright, vía CDP:
 
@@ -75,17 +75,33 @@ Las métricas se leen con `PerformanceObserver` (`first-contentful-paint`,
 
 Siempre sobre la pantalla principal (`/`), que es la del presupuesto.
 
-| Bloque | Fecha | FCP | LCP | `load` | Transferido | Peticiones |
-|---|---|---|---|---|---|---|
-| 1 · Andamiaje | 2026-10-02 | 664 ms | 664 ms | 1 615 ms | ~245 KB | 23 |
-| 2 · Capa de datos, con MSW | 2026-10-03 | 700 ms | 700 ms | 2 784 ms | ~447 KB | 29 |
-| 2 · Capa de datos, sin MSW | 2026-10-03 | 740 ms | 740 ms | 2 215 ms | ~357 KB | 26 |
+| Bloque                     | Fecha      | FCP      | LCP      | `load`       | Transferido | Peticiones |
+| -------------------------- | ---------- | -------- | -------- | ------------ | ----------- | ---------- |
+| 1 · Andamiaje              | 2026-10-02 | 664 ms   | 664 ms   | 1 615 ms     | ~245 KB     | 23         |
+| 2 · Capa de datos, con MSW | 2026-10-03 | 700 ms   | 700 ms   | 2 784 ms     | ~447 KB     | 29         |
+| 2 · Capa de datos, sin MSW | 2026-10-03 | 740 ms   | 740 ms   | 2 215 ms     | ~357 KB     | 26         |
+| 3 · Con el mapa, con MSW   | 2026-10-03 | 1 548 ms | 1 548 ms | **4 888 ms** | **~736 KB** | 46         |
+| 5 · Fichas de ruta, `/`    | 2026-10-06 | 660 ms   | 2 664 ms | 4 998 ms     | ~745 KB     | 39         |
+
+Y las dos pantallas nuevas, medidas igual:
+
+| Pantalla                      | Fecha      | FCP    | LCP      | `load`   | Transferido | Peticiones |
+| ----------------------------- | ---------- | ------ | -------- | -------- | ----------- | ---------- |
+| `/rutas` (catálogo)           | 2026-10-06 | 712 ms | 2 608 ms | 2 856 ms | ~437 KB     | 33         |
+| `/rutas/ruta-21-canal-centro` | 2026-10-06 | 860 ms | 860 ms   | 5 205 ms | ~775 KB     | 40         |
+
+> **Advertencia sobre el entorno de medición.** El contenedor donde se mide no
+> alcanza `basemaps.cartocdn.com`, así que el estilo base se sirvió desde un
+> archivo local mínimo. Los números **no incluyen las teselas de fondo**: el
+> `load` real en un teléfono con el estilo de CARTO es mayor. Sirven para
+> comparar bloques entre sí, que es para lo que está la tabla, no como promesa
+> al usuario. La medición de verdad se hace en el servidor de Hostinger.
 
 ### Qué dicen estos números
 
 **El bloque 2 costó ~110 KB reales** (TanStack Query + Zod + el cliente HTTP) y
 **~90 KB más de MSW**, que desaparecen el día que exista la API: el worker se
-carga en un *chunk* aparte que solo se descarga si
+carga en un _chunk_ aparte que solo se descarga si
 `NEXT_PUBLIC_ENABLE_MOCKS=true`.
 
 **Un error que se atrapó midiendo.** La primera versión envolvía todo el árbol
@@ -102,6 +118,88 @@ presupuesto si el mapa se carga en el paquete principal.
 Decisión tomada de antemano para el bloque 3: **MapLibre entra con
 `next/dynamic`**, fuera del paquete inicial. Es cliente puro de todos modos, así
 que no se pierde nada.
+
+---
+
+## El bloque 3 rompió el presupuesto. Qué pasó exactamente
+
+`load` subió a **4 888 ms** contra los 3 000 del presupuesto, y la
+transferencia a **736 KB** contra los 600. Hay que mirarlo de cerca antes de
+concluir nada, porque el número grande esconde una buena noticia.
+
+### La carga diferida sí funciona
+
+Desglose por momento de descarga, en 4G lenta:
+
+| Momento   | Qué baja                                                                      | Peso        |
+| --------- | ----------------------------------------------------------------------------- | ----------- |
+| ~180 ms   | React, Next, TanStack Query, Zod, MSW, la fuente y el código de la aplicación | **~315 KB** |
+| ~2 300 ms | MapLibre y su hoja de estilos                                                 | **~310 KB** |
+
+Y la comprobación que lo confirma: **`/rutas`, que no tiene mapa, descarga los
+mismos ~315 KB críticos.** Es decir, MapLibre no está en el paquete inicial —
+`next/dynamic` hizo su trabajo. La primera pintura no espera al mapa.
+
+### Dónde está el peso que sí se puede quitar
+
+De esos 315 KB críticos, **unos 90 KB son MSW**, que existe solo porque no hay
+backend. Desaparecen el día que la API responda de verdad. Los 10 GeoJSON que
+el mapa pide en modo simulado también desaparecen cuando haya teselas.
+
+Proyección con dataset real y pmtiles: **~225 KB críticos + ~310 KB de
+MapLibre ≈ 535 KB**, por debajo del presupuesto de transferencia.
+
+Los 310 KB de MapLibre no se pueden reducir: es la biblioteca. O se usa, o se
+cambia de motor de mapas.
+
+### El presupuesto estaba mal planteado
+
+«La pantalla principal carga en menos de 3 s» no dice **qué** significa cargar.
+Medido contra `load`, incluye el mapa dibujado. Medido contra la primera
+pintura, incluye solo la interfaz.
+
+La distinción no es un tecnicismo: **la pantalla es usable antes de que el mapa
+exista.** El buscador y «rutas cerca de mí» están en la hoja inferior, que se
+renderiza en el servidor, y la regla de accesibilidad que obliga a tener una
+alternativa en lista para todo lo que solo se ve en el mapa resulta ser también
+la estrategia de rendimiento: si el mapa tarda, la aplicación sigue sirviendo.
+
+**Presupuesto propuesto, partido en dos:**
+
+| Qué                           | Umbral                 | Estado                 |
+| ----------------------------- | ---------------------- | ---------------------- |
+| Interfaz utilizable (FCP/LCP) | < 2 000 ms en 4G lenta | ✅ 1 548 ms            |
+| Mapa dibujado (`load`)        | < 5 000 ms en 4G lenta | ⚠️ 4 888 ms, al límite |
+| Transferencia total           | < 600 KB sin MSW       | ⚠️ proyectado ~535 KB  |
+
+⚠️ **Requiere decisión.** La condición «4G lenta» de Lighthouse (1.6 Mbps,
+150 ms de ida y vuelta, CPU a un cuarto) es el peor caso realista. En 4G normal
+de Puebla, de 5 a 15 Mbps, estos tiempos se dividen entre tres o cuatro. Hay que
+decidir si el presupuesto se mide contra el peor caso o contra el caso típico, y
+dejarlo escrito; medir contra el peor caso y fallarlo cada vez solo entrena a
+ignorar la medición.
+
+---
+
+## El bloque 5 no costó nada, y además enseñó algo
+
+La pantalla principal se quedó donde estaba (4 888 → 4 998 ms de `load`, dentro
+del ruido de medición): las fichas de ruta son páginas aparte y no agregan
+nada al paquete inicial.
+
+Lo interesante está en la columna del LCP de la ficha: **LCP = FCP = 860 ms**.
+Lo más grande que se pinta es el encabezado de la ruta, y ya venía escrito en
+el HTML que mandó el servidor. Es la diferencia entre renderizar en servidor y
+no hacerlo, medida: el catálogo, que pide sus datos desde el navegador, tarda
+2 608 ms en llegar a su LCP.
+
+De ahí sale una regla práctica para las pantallas que faltan: **lo que se
+pueda escribir en el HTML del servidor, se escribe**; el cliente queda para lo
+que de verdad depende del navegador (el mapa, la ubicación, el estado de la
+URL).
+
+El `load` de la ficha (5 205 ms) es el mapa terminando de dibujarse, igual que
+en la pantalla principal. La página ya es usable mucho antes.
 
 ---
 

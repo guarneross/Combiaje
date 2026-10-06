@@ -12,7 +12,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
+    "rutas": "node scripts/construir-rutas.mjs"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

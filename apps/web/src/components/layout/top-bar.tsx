@@ -18,11 +18,19 @@ export function TopBar({
   volverA,
   acciones,
   className,
+  tituloComo: Titulo = "h1",
 }: {
   titulo: string;
   volverA?: string;
   acciones?: ReactNode;
   className?: string;
+  /**
+   * Etiqueta del título de la barra. Por omisión `h1`, porque en la mayoría de
+   * las pantallas la barra *es* el encabezado de la página. En la ficha de
+   * ruta no: ahí el encabezado real es el nombre de la ruta, y dos `h1`
+   * compiten entre sí para un lector de pantalla y para Google.
+   */
+  tituloComo?: "h1" | "p";
 }) {
   return (
     <header
@@ -42,9 +50,9 @@ export function TopBar({
           <span className="w-2" />
         )}
 
-        <h1 className="min-w-0 flex-1 truncate px-1 text-base font-semibold tracking-tight">
+        <Titulo className="min-w-0 flex-1 truncate px-1 text-base font-semibold tracking-tight">
           {titulo}
-        </h1>
+        </Titulo>
 
         {acciones}
         <ThemeToggle />

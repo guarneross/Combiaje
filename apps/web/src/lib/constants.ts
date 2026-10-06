@@ -31,7 +31,7 @@ export const NEARBY_MAX_RESULTS = 20;
 
 /** Atribución obligatoria. ODbL: no es opcional ni decorativa. */
 export const MAP_ATTRIBUTION =
-  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a> · Datos de Combiaje bajo ODbL';
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a> · <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">© CARTO</a> · Datos de Combiaje bajo ODbL';
 
 export const SITE_NAME = "Combiaje";
 export const SITE_DESCRIPTION =

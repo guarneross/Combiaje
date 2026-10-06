@@ -27,6 +27,12 @@ const schema = z.object({
     .string()
     .min(1)
     .default("https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"),
+  /**
+   * Archivo de teselas de las rutas, generado con tippecanoe.
+   * Vacío mientras no exista el dataset: el mapa cae entonces al GeoJSON de
+   * las rutas simuladas. Ver `components/map/use-routes-source.ts`.
+   */
+  NEXT_PUBLIC_ROUTES_PMTILES_URL: z.string().default(""),
 });
 
 const parsed = schema.safeParse({
@@ -35,6 +41,7 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_ENABLE_MOCKS: process.env.NEXT_PUBLIC_ENABLE_MOCKS,
   NEXT_PUBLIC_MAP_STYLE_URL: process.env.NEXT_PUBLIC_MAP_STYLE_URL,
   NEXT_PUBLIC_MAP_STYLE_URL_DARK: process.env.NEXT_PUBLIC_MAP_STYLE_URL_DARK,
+  NEXT_PUBLIC_ROUTES_PMTILES_URL: process.env.NEXT_PUBLIC_ROUTES_PMTILES_URL,
 });
 
 if (!parsed.success) {

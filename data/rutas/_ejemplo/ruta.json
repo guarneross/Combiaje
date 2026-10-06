@@ -1,0 +1,55 @@
+{
+  "shortName": "72",
+  "longName": "Centro – La Margarita",
+  "color": "#059669",
+  "fareCents": 950,
+  "status": "draft",
+  "dataSource": "manual",
+  "agency": {
+    "name": "Autotransportes Unidos de Puebla",
+    "shortName": "AUP",
+    "type": "urbano"
+  },
+  "notas": "Trazada de memoria el 2026-10-03. PENDIENTE verificar en campo antes de pasar a published.",
+  "_comentarios": {
+    "shortName": "El número como viene rotulado en el parabrisas.",
+    "longName": "Origen – destino, con guion largo.",
+    "color": "Hexadecimal. Usa colores distinguibles entre sí; ver la paleta en docs.",
+    "fareCents": "Tarifa en centavos. 9.50 pesos = 950. null si no la sabes.",
+    "status": "draft hasta que alguien la verifique en campo. Luego published.",
+    "dataSource": "manual si la trazaste de memoria, gps si la grabaste, osm si la importaste.",
+    "yaTrazado": "Ponlo en true solo si tu archivo ya viene pegado a calles desde otra herramienta.",
+    "denominaciones": "Historial de números y colores. Desde 2026 la SMT renumera 95 rutas: guarda aquí el número viejo y el nuevo. La búsqueda encuentra por los dos.",
+    "colorSecundario": "Segundo color de la nomenclatura 2026 (cuenca + identificación). null con la vieja.",
+    "cuenca": "Una de las 21 cuencas que definió la SMT, cuando se conozca."
+  },
+  "colorSecundario": null,
+  "cuenca": null,
+  "denominaciones": [
+    {
+      "shortName": "72",
+      "longName": "Centro – La Margarita",
+      "colores": [
+        "#059669"
+      ],
+      "cuenca": null,
+      "desde": null,
+      "hasta": "2026-10-15",
+      "vigente": false,
+      "fuente": "nomenclatura anterior"
+    },
+    {
+      "shortName": "048",
+      "longName": null,
+      "colores": [
+        "#7C3AED",
+        "#D97706"
+      ],
+      "cuenca": "Cuenca Oriente",
+      "desde": "2026-10-15",
+      "hasta": null,
+      "vigente": true,
+      "fuente": "smt"
+    }
+  ]
+}

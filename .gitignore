@@ -4,6 +4,9 @@ out/
 dist/
 coverage/
 .turbo/
+
+# Geometrías pegadas a calles: se regeneran con `pnpm rutas`.
+data/rutas/*/.cache/
 *.tsbuildinfo
 next-env.d.ts
 

@@ -7,12 +7,12 @@ Para quién: cualquiera del equipo que vaya a tocar la aplicación web, incluido
 tú mismo dentro de tres semanas, después de los parciales, cuando ya no te
 acuerdes de por qué el botón mide 44 px.
 
-| Documento | Qué resuelve |
-|---|---|
-| [`01-arquitectura.md`](./01-arquitectura.md) | Cómo está armado, qué vive dónde y **por qué** se decidió así |
-| [`02-convenciones.md`](./02-convenciones.md) | Cómo escribir código aquí, y recetas para las tareas repetidas |
-| [`03-rendimiento.md`](./03-rendimiento.md) | El presupuesto de carga, cómo se mide y qué se ha medido |
-| [`04-contrato.md`](./04-contrato.md) | La propuesta de `packages/shared` y las seis decisiones pendientes de Arquitectura |
+| Documento                                    | Qué resuelve                                                                       |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [`01-arquitectura.md`](./01-arquitectura.md) | Cómo está armado, qué vive dónde y **por qué** se decidió así                      |
+| [`02-convenciones.md`](./02-convenciones.md) | Cómo escribir código aquí, y recetas para las tareas repetidas                     |
+| [`03-rendimiento.md`](./03-rendimiento.md)   | El presupuesto de carga, cómo se mide y qué se ha medido                           |
+| [`04-contrato.md`](./04-contrato.md)         | La propuesta de `packages/shared` y las seis decisiones pendientes de Arquitectura |
 
 La bitácora cronológica (qué se hizo y cuándo) vive en el proyecto de Claude,
 en `combiaje/13-frontend-bitacora.md`, para que los chats de backend, datos y
@@ -24,14 +24,14 @@ QA la vean sin clonar el repo.
 
 Hito 1 — «La primera ruta vive en producción».
 
-| # | Bloque | Estado |
-|---|---|---|
-| 1 | Andamiaje | ✅ hecho |
-| 2 | Capa de datos (cliente HTTP, TanStack Query, MSW) | ✅ hecho |
-| 3 | `<CombiajeMap>` | ⬜ pendiente |
-| 4 | Pantalla `/` con buscador y «rutas cerca de mí» | ⬜ pendiente |
-| 5 | `/rutas` y `/rutas/[slug]` | ⬜ pendiente |
-| 6 | Pruebas con Vitest | ⬜ pendiente |
+| #   | Bloque                                            | Estado       |
+| --- | ------------------------------------------------- | ------------ |
+| 1   | Andamiaje                                         | ✅ hecho     |
+| 2   | Capa de datos (cliente HTTP, TanStack Query, MSW) | ✅ hecho     |
+| 3   | `<CombiajeMap>`                                   | ✅ hecho     |
+| 4   | Pantalla `/` con buscador y «rutas cerca de mí»   | ✅ hecho     |
+| 5   | `/rutas` y `/rutas/[slug]`                        | ✅ hecho     |
+| 6   | Pruebas con Vitest                                | ⬜ pendiente |
 
 ---
 
@@ -78,14 +78,14 @@ raíz sigue mandando: pnpm 10 lo lee y se ajusta solo.
 
 Todos se corren desde la raíz del repo; Turborepo los reparte.
 
-| Comando | Qué hace |
-|---|---|
-| `pnpm dev` | Servidor de desarrollo |
-| `pnpm build` | Build de producción |
-| `pnpm lint` | ESLint. **No corre dentro de `next build`**: en Next 16 desapareció `next lint` |
-| `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm test` | Vitest (desde el bloque 6) |
-| `pnpm format` | Prettier sobre todo el repo |
+| Comando          | Qué hace                                                                        |
+| ---------------- | ------------------------------------------------------------------------------- |
+| `pnpm dev`       | Servidor de desarrollo                                                          |
+| `pnpm build`     | Build de producción                                                             |
+| `pnpm lint`      | ESLint. **No corre dentro de `next build`**: en Next 16 desapareció `next lint` |
+| `pnpm typecheck` | `tsc --noEmit`                                                                  |
+| `pnpm test`      | Vitest (desde el bloque 6)                                                      |
+| `pnpm format`    | Prettier sobre todo el repo                                                     |
 
 ---
 

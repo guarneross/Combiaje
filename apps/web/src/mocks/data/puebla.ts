@@ -1,5 +1,7 @@
 import type { Agency, RouteDetail, RouteSummary, Stop } from "@combiaje/shared";
 
+import rutasReales from "./rutas-reales.json";
+
 /**
  * ┌──────────────────────────────────────────────────────────────────────┐
  * │  DATOS SIMULADOS. NO SON EL DATASET REAL DE COMBIAJE.                │
@@ -209,7 +211,7 @@ export interface RutaSimulada extends RouteDetail {
   geometrias: [number, number][][];
 }
 
-export const RUTAS: RutaSimulada[] = SEMILLAS.map((semilla, i) => {
+const RUTAS_SINTETICAS: RutaSimulada[] = SEMILLAS.map((semilla, i) => {
   const ida = densificar(semilla.waypoints);
   const vuelta = [...ida].reverse();
   const routeId = uuid(i + 1, "33333333");
@@ -223,6 +225,9 @@ export const RUTAS: RutaSimulada[] = SEMILLAS.map((semilla, i) => {
     longName: semilla.longName,
     color: semilla.color,
     textColor: "#FFFFFF",
+    colorSecondary: null,
+    basin: null,
+    denominations: [],
     fareCents: semilla.fareCents,
     status: "published",
     agency: agencia,
@@ -262,17 +267,33 @@ export const RUTAS: RutaSimulada[] = SEMILLAS.map((semilla, i) => {
   };
 });
 
+/**
+ * En cuanto existe al menos una ruta trazada a mano en `data/rutas/`, las
+ * sintéticas desaparecen. Así el mapa muestra exactamente lo que es real y
+ * nadie confunde una línea recta inventada con un recorrido verificado.
+ *
+ * Para agregar una ruta: ver `data/rutas/README.md`.
+ */
+export const HAY_RUTAS_TRAZADAS = rutasReales.rutas.length > 0;
+
+export const RUTAS: RutaSimulada[] = HAY_RUTAS_TRAZADAS
+  ? (rutasReales.rutas as unknown as RutaSimulada[])
+  : RUTAS_SINTETICAS;
+
+export const CONCESIONARIAS_ACTIVAS: Agency[] = HAY_RUTAS_TRAZADAS
+  ? (rutasReales.concesionarias as Agency[])
+  : CONCESIONARIAS;
+
 export const RUTAS_RESUMEN: RouteSummary[] = RUTAS.map(
-  ({ id, slug, shortName, longName, color, textColor, fareCents, status, agency }) => ({
-    id,
-    slug,
-    shortName,
-    longName,
-    color,
-    textColor,
-    fareCents,
-    status,
-    agency,
+  ({
+    id, slug, shortName, longName, color, textColor,
+    colorSecondary, basin, denominations, fareCents, status, agency,
+  }) => ({
+    id, slug, shortName, longName, color, textColor,
+    colorSecondary: colorSecondary ?? null,
+    basin: basin ?? null,
+    denominations: denominations ?? [],
+    fareCents, status, agency,
   }),
 );
 

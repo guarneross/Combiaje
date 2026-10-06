@@ -7,6 +7,29 @@ La historia larga de cada bloque está en `docs/frontend/` y en el proyecto.
 
 ---
 
+## 2026-10-06 · Bloque 5: catálogo y ficha de ruta
+
+- `/rutas` con búsqueda y filtro por concesionaria (ambos en la URL), y
+  `/rutas/[slug]` **renderizada en servidor**, con la línea de tiempo de
+  denominaciones para la renumeración de la SMT y el resumen de
+  calificaciones. MSW ahora también intercepta en el servidor
+  (`instrumentation.ts`).
+- Tres cosas que se encontraron haciéndolo y se arreglaron:
+  - `app/loading.tsx` hacía que `notFound()` respondiera **200**. Fuera de la
+    raíz; los `Suspense` ahora van en la pantalla que los necesita.
+  - La ficha montaba **dos** mapas (uno `lg:hidden`). Ahora es uno, colocado
+    con `grid`, y el catálogo no lo monta en móvil.
+  - El encuadre heredaba 280 px de relleno inferior en un mapa de 208 px: la
+    ruta salía diminuta. `relleno` es ahora una prop de la pantalla y el mapa
+    lo recorta a lo que cabe.
+- `scripts/construir-rutas.mjs` deriva número y color de la **denominación
+  vigente**, y avisa si el encabezado de `ruta.json` dice otra cosa. Así,
+  cuando llegue el número nuevo de la SMT, basta con anotarlo.
+- Medido: la ficha llega a LCP en 860 ms (LCP = FCP: todo venía en el HTML).
+  La pantalla principal no se movió.
+
+**Sigue:** bloque 6, pruebas con Vitest. Y desplegar.
+
 ## 2026-10-03 · Capa de datos y decisiones de arquitectura
 
 - Bloque 2 terminado: cliente HTTP tipado que valida con Zod, TanStack Query y

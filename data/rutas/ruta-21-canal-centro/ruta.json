@@ -1,0 +1,33 @@
+{
+  "shortName": "21",
+  "longName": "Canal – Rincón",
+  "color": "#E11D48",
+  "textColor": "#FFFFFF",
+  "fareCents": null,
+  "status": "draft",
+  "dataSource": "manual",
+  "agency": {
+    "name": "Por identificar",
+    "shortName": null,
+    "type": "urbano"
+  },
+  "notas": "Ramal Canal – Rincón de la familia 21. Trazado de memoria el 4 de octubre de 2026, segunda versión con 75 puntos. PENDIENTE: tarifa, concesionaria, confirmar el zigzag del inicio, y trazar la vuelta. No pasar a published sin recorrerla en camión. Si match falla, cambiar metodo a \"crudo\".",
+  "metodo": "match",
+  "denominaciones": [
+    {
+      "shortName": "21",
+      "longName": "Canal – Rincón",
+      "colores": [
+        "#E11D48"
+      ],
+      "cuenca": null,
+      "desde": null,
+      "hasta": null,
+      "vigente": true,
+      "fuente": "nomenclatura anterior",
+      "_nota": "La SMT incluyó la Ruta 21 entre las primeras 10 que cambian de número y color. Cuando veas el camión con la imagen nueva: anota aquí el número y los dos colores, pon vigente:false y hasta:'AAAA-MM-DD' en esta entrada, y agrega la nueva con vigente:true."
+    }
+  ],
+  "colorSecundario": null,
+  "cuenca": null
+}

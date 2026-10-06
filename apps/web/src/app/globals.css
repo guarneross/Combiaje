@@ -197,3 +197,54 @@
 @utility bottom-safe {
   bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* ---------------------------------------------------------------------------
+   MapLibre: los controles vienen con su propio aspecto. Se alinean con el
+   resto de la interfaz y se bajan para no chocar con la marca ni con el botón
+   de tema, que flotan arriba.
+--------------------------------------------------------------------------- */
+
+.maplibregl-ctrl-top-right {
+  /* 56 px es la altura de la fila flotante de arriba, más el notch. */
+  margin-top: calc(56px + env(safe-area-inset-top, 0px));
+}
+
+.maplibregl-ctrl-group {
+  border-radius: var(--radius-md);
+  background: var(--background);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.12);
+}
+
+.maplibregl-ctrl-group button {
+  width: 40px;
+  height: 40px;
+  background: transparent;
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--border);
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: var(--accent);
+}
+
+.maplibregl-ctrl-group button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+/* Los iconos vienen en SVG negro: se invierten en modo oscuro. */
+.dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
+
+/* La escala, discreta y legible sobre cualquier fondo. */
+.maplibregl-ctrl-scale {
+  background: var(--background);
+  border-color: var(--border);
+  color: var(--muted-foreground);
+  border-radius: var(--radius-sm);
+  font-variant-numeric: tabular-nums;
+}

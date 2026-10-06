@@ -2,27 +2,36 @@
 
 ## 1. Dónde encaja `apps/web`
 
-Combiaje es un monorepo pnpm + Turborepo con cuatro dueños y una frontera clara
-entre ellos: **el contrato de API**. Nadie improvisa campos.
+> **Cambio de arquitectura, 3 de octubre de 2026.** El proyecto pasó de cuatro
+> personas a una. La API separada en NestJS se descartó: ahora vive como Route
+> Handlers de Next en este mismo repo y despliegue. Las URLs del contrato no
+> cambian, así que el cliente HTTP, los esquemas y MSW siguen igual.
+> El razonamiento completo está en `combiaje/01-plan-solo.md`.
 
 ```
 combiaje/
 ├─ apps/
-│  ├─ web/            Next.js 16 · MapLibre          ← este documento
-│  └─ api/            NestJS 11 · Drizzle · PostGIS  (chat de Backend)
+│  └─ web/
+│     └─ src/
+│        ├─ app/api/v1/     ← la API: Route Handlers + Drizzle + PostGIS
+│        └─ …               ← la aplicación
 ├─ packages/
-│  ├─ shared/         tipos + esquemas Zod           (chat de Arquitectura)
+│  ├─ shared/         tipos + esquemas Zod del contrato
 │  └─ config/         tsconfig y eslint compartidos
 └─ docs/
-   ├─ adr/            decisiones de arquitectura     (chat de Arquitectura)
-   └─ frontend/       esto                           (chat de Frontend)
+   ├─ frontend/       esto
+   └─ datos/          cómo se levanta el dataset
 ```
 
-`packages/shared` **se consume, no se declara**. Si el frontend necesita un tipo
-o un campo que no existe ahí, se marca en la respuesta como
-«⚠️ Requiere aprobación de Arquitectura», se propone en ese chat, y mientras
-tanto se simula con MSW. Redeclarar un tipo de la API en `apps/web` es la forma
-más rápida de que el día que el backend cambie algo nadie se entere.
+`packages/shared` sigue siendo la frontera, aunque ya no separe a dos personas:
+**los tipos de la API se declaran ahí y se consumen aquí.** Redeclararlos en
+`apps/web` es la forma más rápida de que, el día que cambie el esquema, nada
+deje de compilar y nadie se entere.
+
+La disciplina del contrato se conserva por la misma razón: evita que el esquema
+se vuelva un accidente. Lo que cambia es que las propuestas marcadas
+«⚠️ Requiere aprobación de Arquitectura» ahora son decisiones tuyas, que se
+anotan en `docs/frontend/04-contrato.md` antes de implementarlas.
 
 ---
 
@@ -80,13 +89,25 @@ apps/web/
 
 ## 3. La decisión que sostiene el mapa: teselas vectoriales
 
-Las rutas **no** se cargan como GeoJSON. Se registra
-`/api/v1/tiles/routes/{z}/{x}/{y}.mvt` como fuente `vector` de MapLibre y las
-capas `routes` y `stops` se estilizan del lado del cliente.
+Las rutas **no** se cargan como GeoJSON. Con 100 rutas, el GeoJSON completo son
+decenas de megabytes: la aplicación muere en un teléfono real. Las teselas son
+~30 KB cada una y solo llegan las del área visible.
 
-Con 100 rutas, el GeoJSON completo son decenas de megabytes: la aplicación
-muere en un teléfono real. Las teselas son ~30 KB cada una y solo llegan las
-del área visible.
+### De servidor de teselas a archivo estático
+
+> **Cambio del 3 de octubre de 2026.** Con una sola persona y rutas que cambian
+> cada varias semanas, **no hace falta un servidor de teselas**.
+
+Se genera un archivo `rutas.pmtiles` con `tippecanoe` cada vez que cambia el
+dataset, se sube a Supabase Storage, y MapLibre lo lee por rangos HTTP. Pesa
+unos pocos megas. Desaparecen el endpoint `ST_AsMVT`, su caché, su latencia y
+su ruta caliente en el servidor — y el mapa base ya usa pmtiles, así que es la
+misma técnica dos veces en lugar de dos técnicas distintas.
+
+`GET /tiles/routes/{z}/{x}/{y}.mvt` queda **archivado en el contrato**: si algún
+día hay miles de rutas o datos en tiempo real, se reactiva sin tocar el cliente.
+`<CombiajeMap>` encapsula de qué fuente salen los trazos, así que ninguna
+pantalla se entera de la diferencia.
 
 Consecuencias que hay que aprovechar, no sufrir:
 
@@ -160,6 +181,74 @@ Los datos simulados están marcados en el propio archivo: **no son el dataset
 real** y nada de ahí debe acabar en el GTFS que se publique bajo ODbL. Los
 trazos son líneas entre puntos de referencia conocidos del corredor
 CAPU ↔ Centro ↔ Angelópolis, no recorridos reales.
+
+---
+
+## 3 ter. Las pantallas de ruta (`/rutas` y `/rutas/[slug]`)
+
+### La ficha es de servidor, y eso tiene consecuencias
+
+`/rutas/[slug]` es la página que tiene que salir cuando alguien busca
+«ruta 21 Puebla» en Google. Por eso su contenido —número, nombre, tarifa,
+longitud, sentidos, denominaciones, origen del dato— se renderiza **en el
+servidor** y viaja en el HTML inicial. Lo único de cliente es el mapa, en
+`<RouteMapPanel>`.
+
+Para que eso funcione con el backend todavía inexistente, MSW tiene que
+interceptar también **en el servidor**: `src/instrumentation.ts` levanta
+`setupServer` cuando `NEXT_PUBLIC_ENABLE_MOCKS=true` y el runtime es Node.
+Sin eso la página se renderizaba vacía y «arreglarla» habría significado
+volverla de cliente, que es justo lo que no queremos.
+
+Se mide solo: en la ficha, **LCP = FCP** (ver `03-rendimiento.md`), porque lo
+más grande que se pinta ya venía escrito en el HTML.
+
+### `notFound()` tiene que responder 404 de verdad
+
+`cargarRuta()` solo convierte en «no encontrada» un **404 de la API**;
+cualquier otro error se vuelve a lanzar, para que un backend caído no se
+disfrace de ruta inexistente.
+
+Y para que el 404 llegue como 404 —no como 200 con cara de 404— no puede
+haber un `Suspense` por encima que obligue a Next a mandar el HTML antes de
+tiempo. De ahí la regla:
+
+> **Los límites de `Suspense` van en la pantalla que los necesita, nunca en
+> `app/loading.tsx`.**
+
+Hoy los tiene `app/page.tsx` (porque `<PantallaMapa>` lee la URL con nuqs, y
+eso usa `useSearchParams()`) y `app/rutas/page.tsx` (por lo mismo con
+`<RouteCatalog>`). La ficha no tiene ninguno, y por eso puede contestar 404.
+
+`app/rutas/[slug]/not-found.tsx` da el mensaje concreto («esta ruta todavía no
+está en Combiaje, puede que haya cambiado de número con la renumeración») en
+vez del genérico de la aplicación.
+
+### Un solo mapa por pantalla
+
+Esconder un mapa con `hidden lg:block` lo esconde pero **no lo desmonta**: eran
+dos instancias de MapLibre, dos contextos WebGL y dos descargas del estilo en
+un teléfono que solo iba a ver una. Dos reglas:
+
+- Cuando el mismo mapa cambia de lugar según el tamaño (la ficha), se monta
+  **una vez** y lo coloca CSS: `flex` en móvil, `grid` de dos columnas en
+  escritorio.
+- Cuando el mapa solo existe en escritorio (el catálogo), se usa
+  `<RouteMapPanel soloDesdeLg>`, que consulta `matchMedia` con
+  `useSyncExternalStore` y **no lo monta** por debajo de `lg`.
+
+Verificado contando `<canvas>`: móvil `/rutas` → 0, móvil ficha → 1,
+escritorio ambas → 1.
+
+### El relleno del encuadre lo pone la pantalla, no el mapa
+
+`<CombiajeMap>` recibe `relleno` (arriba/abajo/izquierda/derecha en píxeles):
+es lo que **esa pantalla** tapa con sus propios controles. La principal declara
+280 px abajo por la hoja; la ficha no declara nada y usa el valor base.
+
+Además el mapa **recorta** el relleno a lo que cabe en su contenedor. Sin eso,
+heredar los 280 px de la pantalla principal en un mapa de 208 px de alto dejaba
+la ruta diminuta y fuera de cuadro: MapLibre no valida que el relleno quepa.
 
 ---
 
@@ -266,20 +355,27 @@ Déjalos documentados o los vuelve a pisar el siguiente.
 4. **No declarar `Cache-Control` propio para `/_next/static/*`.** Next ya los
    sirve con hash en el nombre e `immutable`, y sobrescribirlo rompe la recarga
    en caliente en desarrollo.
+5. **Un `loading.tsx` en la raíz hace que `notFound()` responda 200.** Ese
+   archivo envuelve toda la aplicación en un `Suspense`, así que Next manda el
+   HTML —y con él el código de estado— antes de saber si la página existe.
+   Resultado: `/rutas/una-que-no-existe` devolvía **200 OK** con el contenido
+   de «no encontrada», que para Google significa «esta página es válida,
+   indéxala». El límite de `Suspense` va donde de verdad hace falta (§3 ter),
+   no en la raíz.
 
 ---
 
 ## 6. Versiones instaladas
 
-| Paquete | Versión | Nota |
-|---|---|---|
-| Next.js | 16.3.8 | Turbopack por omisión |
-| React / React DOM | 19.3.0 | |
-| Tailwind CSS | 4.3.3 | Configuración en CSS, sin `tailwind.config.js` |
-| TypeScript | 5.9.3 | Ver §4 |
-| pnpm | 10.18.0 | Fijado en `packageManager` |
-| Turborepo | 2.11.6 | |
-| Zod | 4.6.5 | |
+| Paquete           | Versión | Nota                                           |
+| ----------------- | ------- | ---------------------------------------------- |
+| Next.js           | 16.3.8  | Turbopack por omisión                          |
+| React / React DOM | 19.3.0  |                                                |
+| Tailwind CSS      | 4.3.3   | Configuración en CSS, sin `tailwind.config.js` |
+| TypeScript        | 5.9.3   | Ver §4                                         |
+| pnpm              | 10.18.0 | Fijado en `packageManager`                     |
+| Turborepo         | 2.11.6  |                                                |
+| Zod               | 4.6.5   |                                                |
 
 ---
 

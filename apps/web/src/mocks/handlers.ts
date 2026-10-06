@@ -3,7 +3,7 @@ import { delay, http, HttpResponse } from "msw";
 
 import { API_BASE } from "@/lib/env";
 
-import { CONCESIONARIAS, PARADAS, RUTAS, RUTAS_RESUMEN } from "./data/puebla";
+import { CONCESIONARIAS_ACTIVAS, PARADAS, RUTAS, RUTAS_RESUMEN } from "./data/puebla";
 import { distanciaATrazo, recuadroDe, type Posicion } from "./geo";
 import { escenarioActual, retrasoMs } from "./scenarios";
 
@@ -59,7 +59,10 @@ export const handlers = [
         (r) =>
           normalizar(r.shortName).includes(aguja) ||
           normalizar(r.longName).includes(aguja) ||
-          normalizar(r.agency?.shortName ?? "").includes(aguja),
+          normalizar(r.agency?.shortName ?? "").includes(aguja) ||
+          // Por el número viejo también: durante la renumeración de la SMT,
+          // quien escribe «38A» tiene que encontrar la que hoy es 061.
+          (r.denominations ?? []).some((d) => normalizar(d.shortName).includes(aguja)),
       );
     }
     if (agency) {
@@ -117,7 +120,7 @@ export const handlers = [
   http.get(u("/agencies"), async () => {
     const fallo = await compuerta();
     if (fallo) return fallo;
-    return HttpResponse.json(escenarioActual() === "vacio" ? [] : CONCESIONARIAS);
+    return HttpResponse.json(escenarioActual() === "vacio" ? [] : CONCESIONARIAS_ACTIVAS);
   }),
 
   http.get(u("/stops"), async ({ request }) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 import { QueryProvider } from "./query-provider";
 import { ThemeProvider } from "./theme-provider";
@@ -21,7 +22,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
       disableTransitionOnChange
       storageKey="combiaje-tema"
     >
-      <QueryProvider>{children}</QueryProvider>
+      <NuqsAdapter>
+        <QueryProvider>{children}</QueryProvider>
+      </NuqsAdapter>
     </ThemeProvider>
   );
 }
