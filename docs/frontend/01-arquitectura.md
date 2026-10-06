@@ -362,6 +362,11 @@ Déjalos documentados o los vuelve a pisar el siguiente.
    de «no encontrada», que para Google significa «esta página es válida,
    indéxala». El límite de `Suspense` va donde de verdad hace falta (§3 ter),
    no en la raíz.
+6. **Turbopack no compila en hosting compartido.** `next build` (Turbopack)
+   truena al procesar `maplibre-gl.css` con PostCSS: necesita lanzar un proceso
+   de Node aparte y en Hostinger ese proceso no arranca. El build de producción
+   usa `--webpack`, en el servidor **y en local**, para que sea el mismo en los
+   dos lados. `pnpm dev` sigue con Turbopack. Ver `docs/despliegue.md`.
 
 ---
 

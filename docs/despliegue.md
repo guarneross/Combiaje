@@ -8,13 +8,13 @@
    tenga un patrocinador —la vía de ingreso número uno del modelo de negocio—
    estaríamos fuera de términos. Hostinger no tiene esa restricción.
 
-| Pieza | Dónde vive | Por qué |
-|---|---|---|
-| Aplicación Next.js (web + API) | **Hostinger**, Node 24 | Soporta Next.js y pnpm; sin límite de uso comercial |
-| PostgreSQL + PostGIS | **Supabase**, capa gratuita | Hostinger compartido solo da MySQL, y PostGIS es obligatorio |
-| Autenticación | **Supabase Auth** | Viene con la base |
-| `rutas.pmtiles` y mapa base | **Hostinger**, archivo estático | Ancho de banda ilimitado; mejor que la capa gratuita de Supabase Storage |
-| Correo de contacto | **Hostinger** | El plan maestro §13 lo exige y Vercel no hace correo |
+| Pieza                          | Dónde vive                      | Por qué                                                                  |
+| ------------------------------ | ------------------------------- | ------------------------------------------------------------------------ |
+| Aplicación Next.js (web + API) | **Hostinger**, Node 24          | Soporta Next.js y pnpm; sin límite de uso comercial                      |
+| PostgreSQL + PostGIS           | **Supabase**, capa gratuita     | Hostinger compartido solo da MySQL, y PostGIS es obligatorio             |
+| Autenticación                  | **Supabase Auth**               | Viene con la base                                                        |
+| `rutas.pmtiles` y mapa base    | **Hostinger**, archivo estático | Ancho de banda ilimitado; mejor que la capa gratuita de Supabase Storage |
+| Correo de contacto             | **Hostinger**                   | El plan maestro §13 lo exige y Vercel no hace correo                     |
 
 ## Datos del servidor
 
@@ -49,23 +49,61 @@ pnpm install
 pnpm --filter @combiaje/web build
 ```
 
+### ⚠️ El build de producción usa webpack, no Turbopack
+
+`apps/web` compila con `next build --webpack`. No es nostalgia: **Turbopack
+revienta en el servidor de Hostinger**. Al procesar `maplibre-gl.css` con
+PostCSS necesita lanzar un proceso de Node aparte, y en hosting compartido ese
+proceso no arranca:
+
+```
+FATAL: An unexpected Turbopack error occurred.
+- Execution of evaluate_webpack_loader failed
+- creating new process
+- node process exited before we could connect to it with exit status: 0
+```
+
+El límite de procesos del plan (120) y la memoria compartida son la causa
+probable. Con webpack el mismo build pasa sin tocar nada más.
+
+Se usa webpack **también en local**, a propósito: un build de producción que se
+arma distinto en tu máquina y en el servidor es una fuente de errores que solo
+aparecen en producción. `pnpm dev` sigue con Turbopack, que es donde la
+velocidad importa.
+
 ### ⚠️ El detalle que rompe todos los despliegues standalone
 
 Next **no copia** `public/` ni `.next/static/` dentro de `.next/standalone`.
 Si se sube tal cual, el sitio carga sin estilos, sin fuentes y sin iconos.
 Hay que copiarlos:
 
-```bash
-cd apps/web
-cp -r public        .next/standalone/apps/web/public
-cp -r .next/static  .next/standalone/apps/web/.next/static
-```
+Ya no hay que acordarse: `scripts/preparar-standalone.mjs` lo hace al final de
+cada build, en Windows y en el servidor por igual (nada de `cp -r`). Está
+enganchado al script `build` de `apps/web`.
 
 Lo que se sube es el contenido de `.next/standalone/`, y se arranca con:
 
 ```bash
 node apps/web/server.js      # respeta PORT y HOSTNAME
 ```
+
+## La configuración exacta en hPanel
+
+Se crea con **Sitios web → Crear sitio web → Aplicación web**, eligiendo el
+subdominio `combiaje.joscian.com` (nunca `joscian.com`: ahí vive el POS).
+
+| Campo            | Valor                                                         |
+| ---------------- | ------------------------------------------------------------- |
+| Framework preset | `Other`                                                       |
+| Node version     | `22.x`                                                        |
+| Root directory   | `./` — la raíz del monorepo, donde está `pnpm-workspace.yaml` |
+| Package manager  | `pnpm`                                                        |
+| Build command    | `pnpm run build`                                              |
+| Output directory | `apps/web/.next`                                              |
+| Entry file       | `apps/web/.next/standalone/apps/web/server.js`                |
+
+El _entry file_ conserva `apps/web` dentro del paquete autocontenido porque
+`outputFileTracingRoot` apunta a la raíz del monorepo.
 
 ## Variables de entorno en producción
 
