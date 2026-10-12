@@ -73,9 +73,28 @@ async function leerRespuesta(respuesta, donde) {
 }
 
 const SENTIDOS = [
-  { archivo: "ida.geojson", nombre: "Ida", direction: 0, principal: true },
-  { archivo: "vuelta.geojson", nombre: "Vuelta", direction: 1, principal: false },
+  { base: "ida", nombre: "Ida", direction: 0, principal: true },
+  { base: "vuelta", nombre: "Vuelta", direction: 1, principal: false },
 ];
+
+/**
+ * Extensiones que se aceptan para cada sentido, en orden de preferencia.
+ *
+ * `.gpx` es lo que sueltan las aplicaciones de registro del teléfono: una
+ * grabación hecha a bordo del camión. `.geojson` es lo que sale de dibujar a
+ * mano en un editor de mapas. Si existen los dos, gana la grabación: es la
+ * realidad medida, no la memoria.
+ */
+const EXTENSIONES = [".gpx", ".geojson", ".json"];
+
+/**
+ * Una grabación de GPS trae un punto por segundo: un recorrido de 40 minutos
+ * son 2 400 puntos. El emparejador no los necesita —y los servidores públicos
+ * de OSRM rechazan peticiones de más de 100 coordenadas—, así que la traza se
+ * adelgaza antes de preguntar.
+ */
+const GPS_METROS_ENTRE_PUNTOS = 60;
+const GPS_MAXIMO_PUNTOS = 95;
 
 /** UUID determinista a partir de un texto: el mismo slug da siempre el mismo id. */
 function idDesde(texto) {
@@ -137,6 +156,77 @@ function extraerPuntos(geojson, donde) {
     }
   }
   throw new Error(`${donde}: no encontré una LineString con al menos dos puntos.`);
+}
+
+/**
+ * Saca los puntos de un archivo GPX, que es lo que exportan las aplicaciones
+ * de registro del teléfono.
+ *
+ * Se lee con expresiones regulares a propósito: un GPX es XML plano y
+ * previsible, y meter un analizador de XML completo al proyecto por esto sería
+ * desproporcionado. Se aceptan `trkpt` (una traza grabada) y `rtept` (una ruta
+ * planeada); el orden del archivo es el orden del recorrido.
+ */
+function extraerPuntosGpx(xml, donde) {
+  const puntos = [];
+  for (const etiqueta of xml.match(/<(?:trkpt|rtept)\b[^>]*>/g) ?? []) {
+    const lat = Number(etiqueta.match(/\blat\s*=\s*"([^"]+)"/)?.[1]);
+    const lng = Number(etiqueta.match(/\blon\s*=\s*"([^"]+)"/)?.[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) puntos.push([lng, lat]);
+  }
+  if (puntos.length < 2) {
+    throw new Error(`${donde}: no encontré al menos dos puntos de traza (<trkpt>) en el GPX.`);
+  }
+  return puntos;
+}
+
+/**
+ * Adelgaza una grabación de GPS: conserva un punto cada ~N metros.
+ *
+ * Además de respetar el límite del motor, quita el ruido de cuando el camión
+ * está parado —en un semáforo o en la terminal el GPS sigue escribiendo puntos
+ * encimados, que se ven como una maraña— sin perder ninguna vuelta: los puntos
+ * se conservan por distancia recorrida, no por tiempo.
+ */
+function adelgazarGps(puntos, donde) {
+  const original = puntos.length;
+  let salida = [puntos[0]];
+  for (let i = 1; i < puntos.length - 1; i++) {
+    if (longitudM([salida[salida.length - 1], puntos[i]]) >= GPS_METROS_ENTRE_PUNTOS) {
+      salida.push(puntos[i]);
+    }
+  }
+  salida.push(puntos[puntos.length - 1]);
+
+  // Si aun así son demasiados (una ruta muy larga), se toma uno de cada n.
+  if (salida.length > GPS_MAXIMO_PUNTOS) {
+    const paso = Math.ceil(salida.length / GPS_MAXIMO_PUNTOS);
+    const recortada = salida.filter((_, i) => i % paso === 0);
+    if (recortada[recortada.length - 1] !== salida[salida.length - 1]) {
+      recortada.push(salida[salida.length - 1]);
+    }
+    salida = recortada;
+  }
+
+  console.log(`  · ${donde}: grabación de ${original} puntos adelgazada a ${salida.length}`);
+  return salida;
+}
+
+/** Elige el archivo del sentido y devuelve sus puntos, venga de donde venga. */
+async function leerSentido(base, nombreBase, slug) {
+  for (const extension of EXTENSIONES) {
+    const archivo = path.join(base, `${nombreBase}${extension}`);
+    if (!existsSync(archivo)) continue;
+
+    const donde = `${slug}/${nombreBase}${extension}`;
+    const texto = await readFile(archivo, "utf8");
+
+    if (extension === ".gpx") {
+      return { donde, esGps: true, puntos: adelgazarGps(extraerPuntosGpx(texto, donde), donde) };
+    }
+    return { donde, esGps: false, puntos: extraerPuntos(JSON.parse(texto), donde) };
+  }
+  return null;
 }
 
 /**
@@ -349,19 +439,18 @@ async function main() {
     const rutaId = idDesde(`ruta:${slug}`);
     const variants = [];
     const geometrias = [];
+    let algoGrabado = false;
 
     for (const sentido of SENTIDOS) {
-      const archivo = path.join(base, sentido.archivo);
-      if (!existsSync(archivo)) {
-        console.log(`  · sin ${sentido.archivo}, me la salto`);
+      const leido = await leerSentido(base, sentido.base, slug);
+      if (!leido) {
+        console.log(`  · sin ${sentido.base}.gpx ni ${sentido.base}.geojson, me la salto`);
         continue;
       }
 
-      const donde = `${slug}/${sentido.archivo}`;
-      const puntos = limpiarPuntos(
-        extraerPuntos(JSON.parse(await readFile(archivo, "utf8")), donde),
-        donde,
-      );
+      const { donde, esGps } = leido;
+      if (esGps) algoGrabado = true;
+      const puntos = limpiarPuntos(leido.puntos, donde);
       avisarRetrocesos(puntos, donde);
       const [pLng, pLat] = puntos[0];
       const [uLng, uLat] = puntos[puntos.length - 1];
@@ -449,6 +538,11 @@ async function main() {
       continue;
     }
 
+    const origenDelDato = algoGrabado ? "gps" : (meta.dataSource ?? "manual");
+    if (algoGrabado && (meta.dataSource ?? "manual") !== "gps") {
+      console.log(`  · hay grabación GPS: el origen del dato queda como "gps".`);
+    }
+
     const denominations = (meta.denominaciones ?? []).map((d) => ({
       shortName: d.shortName,
       longName: d.longName ?? null,
@@ -503,7 +597,11 @@ async function main() {
       fareCents: meta.fareCents ?? null,
       status: meta.status ?? "draft",
       agency: concesionarias.get(idConcesionaria),
-      dataSource: meta.dataSource ?? "manual",
+      // El origen del dato lo manda la realidad: si hubo una grabación, el
+      // trazo es `gps` aunque `ruta.json` siga diciendo `manual` de cuando se
+      // dibujó de memoria. La ficha lo enseña al público y tiene que ser
+      // cierto.
+      dataSource: origenDelDato,
       updatedAt: new Date().toISOString(),
       variants,
       ratingStats: null,

@@ -213,3 +213,67 @@ verlo con los ojos y no solo imaginarlo.
 - No dejar una pantalla sin sus tres estados.
 - No subir un cambio que empeore el presupuesto de carga sin decirlo. Ver
   `03-rendimiento.md`.
+
+## 9. Pruebas
+
+```bash
+pnpm test          # una pasada
+pnpm test:watch    # mientras escribes
+```
+
+Vitest con Testing Library y jsdom. La configuración está en
+`apps/web/vitest.config.mts`; el arranque común, en `src/pruebas/`.
+
+### Qué se prueba, y qué no
+
+Lo que se prueba es **lo que el usuario ve en cada estado** y **las decisiones
+que se tomaron a propósito**. Una prueba vale la pena si se rompería cuando
+alguien «simplifica» el código sin saber por qué estaba así:
+
+- Los tres estados obligatorios de cada pantalla, más el caso con datos.
+- El mínimo de dos letras en el buscador.
+- No ofrecer «reintentar» cuando el usuario **negó** el permiso de ubicación
+  —ahí hay que cambiarlo en el navegador, y un botón que no sirve es peor que
+  ninguno—, pero sí ofrecerlo cuando el GPS falló por otra razón.
+- Encontrar una ruta escribiendo su **número anterior**. Es el _plus_ del
+  proyecto durante la renumeración de la SMT; si se rompe, Combiaje deja de
+  servir justo cuando más falta hace.
+- Que el cliente HTTP **rechace una respuesta que no cumpla el contrato**,
+  aunque venga con 200.
+
+No se prueba que React renderice, que Tailwind aplique clases, ni la
+maquetación. Eso lo cuida el navegador y lo vemos con los ojos.
+
+### Las reglas de la casa
+
+**Las pruebas traen sus propios datos.** En `src/pruebas/datos.ts`, con la
+forma exacta del contrato. No se usan las rutas de `mocks/data/puebla.ts`: ese
+archivo cambia cada vez que se traza una ruta real, y una prueba que afirme
+«hay tres resultados» empezaría a fallar el día que subas la cuarta ruta de
+Puebla.
+
+**Se responde con MSW, no con un `fetch` falso.** `server.use(...)` sobrescribe
+el handler que haga falta. Así lo que se prueba es la aplicación hablando con
+el contrato de verdad —pasando por Zod y por `ApiError`—, que es lo que va a
+valer el día que exista el backend.
+
+**Un `QueryClient` nuevo por prueba**, con `retry: false`. Compartirlo haría
+que la caché de una prueba contestara la siguiente, y entonces una prueba del
+estado de error pasaría solo porque otra ya había traído datos.
+
+**Se busca por rol y por texto visible**, como lo haría una persona. Nada de
+`data-testid`: si no se puede encontrar un elemento por su rol o su etiqueta,
+el problema suele ser de accesibilidad, no de la prueba.
+
+> Ojo con `findByRole("status")`: el esqueleto de carga también es un `status`
+> (dice «Cargando rutas…» para los lectores de pantalla). Espera primero al
+> dato y después afirma sobre el resumen.
+
+### Comprobar que una prueba sirve
+
+Una prueba que nunca falla no protege nada. Al escribirla, **rómpela a
+propósito**: cambia el valor que afirma, corre `pnpm test`, y confirma que
+truena. Luego deshaz el cambio.
+
+Así se verificó esta tanda: con `MINIMO_BUSQUEDA` en 1 y con el botón de
+reintentar siempre visible, fallaron exactamente las dos pruebas que debían.

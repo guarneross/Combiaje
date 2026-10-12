@@ -3,10 +3,42 @@
 Esto convierte lo que traes en la cabeza en un trazo que sigue calles de
 verdad. Toma unos 15 minutos por sentido la primera vez.
 
+## La receta corta
+
+```bash
+pnpm ruta:nueva ruta-72-centro-la-margarita 72 "Centro – La Margarita"
+#   dibuja ida.geojson y vuelta.geojson en geojson.io y guárdalos en esa carpeta
+pnpm rutas     # pega los puntos a las calles
+pnpm dev       # míralo
+git add -A && git commit -m "Ruta 72" && git push    # queda en línea en ~2 min
+```
+
+Lo demás de este documento es el detalle: dónde poner los puntos, qué hacer
+cuando el trazo sale con rodeos, y qué significa cada campo.
+
 **No dibujes el recorrido completo a mano.** Marcas unos cuantos puntos de paso
 y un motor de ruteo calcula el camino real entre ellos, respetando sentidos
 únicos y vueltas prohibidas. Dibujar a mano produce líneas que cortan esquinas
 y atraviesan manzanas.
+
+---
+
+## Dos formas de conseguir el trazo
+
+|                     | **Dibujarlo** (geojson.io) | **Grabarlo** (subiéndote al camión) |
+| ------------------- | -------------------------- | ----------------------------------- |
+| Qué necesitas       | Memoria y una computadora  | Una hora y pasaje                   |
+| Archivo             | `ida.geojson`              | `ida.gpx`                           |
+| Qué tan fiel es     | Lo que recuerdas           | Por dónde pasó de verdad            |
+| `status` que merece | `draft`                    | Candidato a `published`             |
+
+Las dos entran por la misma puerta: `pnpm rutas`. Si existen las dos para el
+mismo sentido, **gana la grabación**: es la realidad medida, no la memoria.
+Y el origen del dato pasa solo a `gps`, que es lo que la ficha le enseña a la
+gente.
+
+Dibujar sirve para empezar hoy. Grabar es lo que convierte a Combiaje en algo
+que nadie más tiene. La sección **«Grabarla a bordo»**, más abajo, explica cómo.
 
 ---
 
@@ -49,17 +81,33 @@ con sus coordenadas.
 
 ## Paso 2 · Guárdalo en el proyecto
 
-Crea una carpeta con el identificador de la ruta y mete ahí los archivos:
+Crea la carpeta con un comando, para no copiar `_ejemplo/` ni acordarte de
+borrar sus comentarios:
+
+```bash
+pnpm ruta:nueva ruta-72-centro-la-margarita 72 "Centro – La Margarita"
+```
+
+Eso deja `ruta.json` listo, con un **color que no esté usando otra ruta** y la
+denominación vigente ya llenada. Luego metes ahí los dos GeoJSON:
 
 ```
 data/rutas/ruta-72-centro-la-margarita/
-├─ ruta.json        ← copia _ejemplo/ruta.json y edítalo
+├─ ruta.json        ← lo creó el comando; revisa tarifa y concesionaria
 ├─ ida.geojson      ← lo que descargaste
 └─ vuelta.geojson   ← el sentido contrario, trazado aparte
 ```
 
+Los nombres `ida.geojson` y `vuelta.geojson` **son exactos**: el script busca
+esos dos y nada más. Si solo tienes uno, no pasa nada —la ficha avisa que falta
+el regreso—, pero una ruta sin vuelta sirve a medias.
+
 El nombre de la carpeta es el `slug`: minúsculas, números y guiones. Es lo que
 va a salir en la URL (`/rutas/ruta-72-centro-la-margarita`).
+
+> `ruta.json` es **uno por ruta**, no uno por sentido. Lo que cambia entre ida
+> y vuelta es el GeoJSON; el número, el nombre, el color y la tarifa son los
+> mismos.
 
 > **Ida y vuelta son dos trazos distintos, no uno invertido.** En el centro de
 > Puebla, con calles de un solo sentido, el camión regresa por otra calle.
@@ -91,17 +139,103 @@ diez simuladas y usa solo las tuyas.** Así ves exactamente lo que es real.
 Si el trazo se desvía, vuelve a geojson.io, agrega o mueve un punto donde se
 equivocó, guarda otra vez y corre `pnpm rutas`.
 
+## Paso 5 · Publícalo
+
+```bash
+git add -A
+git commit -m "Ruta 72 Centro – La Margarita"
+git push
+```
+
+El push dispara el despliegue solo y en un par de minutos la ruta está en
+**combiaje.joscian.com**. No hay que tocar el panel de Hostinger.
+
+Lo que de verdad viaja es `apps/web/src/mocks/data/rutas-reales.json`, que
+genera `pnpm rutas`. **Si lo olvidas en el commit, la ruta no aparece en línea
+aunque se vea perfecta en tu máquina.** Por eso el `git add -A`.
+
 ---
+
+## Grabarla a bordo
+
+Te subes al camión con el teléfono grabando y bajas con el recorrido real.
+
+### Qué aplicación
+
+Cualquiera que exporte **GPX**. En Android sirven **GPS Logger**, **Geo
+Tracker** u **OsmAnd**; en iPhone, **MyTracks** o **Open GPX Tracker**. No uses
+una de ejercicio que solo exporte a su propia nube.
+
+Configúrala así antes de salir:
+
+- **Un punto cada 1 o 2 segundos**, o cada 5 metros. Lo que ofrezca.
+- **Precisión alta / GPS, no «ahorro de batería»**. Esa opción usa las antenas
+  del celular y el trazo sale a cuadras de distancia.
+- **Que siga grabando con la pantalla apagada.** Casi todas lo piden como
+  permiso aparte; si no se lo das, se detiene al guardar el teléfono.
+
+### En el camión
+
+1. **Empieza a grabar al subirte**, no antes. Si grabas tu caminata a la
+   parada, esa caminata queda dentro del recorrido de la ruta.
+2. **Siéntate junto a la ventana.** En medio del pasillo, rodeado de gente y
+   lámina, el GPS se degrada bastante.
+3. **Un sentido por archivo.** Llegas a la terminal, detienes la grabación y
+   guardas. Para el regreso, empiezas una grabación nueva.
+4. **Detén la grabación al bajarte.**
+
+El teléfono en la mano o junto al vidrio. En la bolsa del pantalón también
+funciona, pero peor.
+
+### Lo que solo puedes averiguar ahí arriba
+
+El recorrido es la mitad de lo que traes del viaje. Anota también:
+
+- **La tarifa exacta**, y si cambia con estudiante o tercera edad.
+- **El nombre de la concesionaria**, rotulado en la puerta o en el costado.
+- **El número de la unidad**, el que va pintado grande.
+- **El número y los colores nuevos de la SMT**, si ya los trae el parabrisas.
+  Eso va a `denominaciones` y es lo que nadie más está guardando.
+- Dónde arranca y dónde termina de verdad, que casi nunca es donde uno cree.
+
+Una foto del parabrisas y otra del costado te resuelven casi todo esto.
+
+### De vuelta en la computadora
+
+Pasa el `.gpx` a la carpeta de la ruta con **ese nombre exacto**:
+
+```
+data/rutas/ruta-72-centro-la-margarita/
+├─ ruta.json
+├─ ida.gpx        ← la grabación de ida
+└─ vuelta.gpx     ← la grabación de regreso
+```
+
+Y corre `pnpm rutas` como siempre.
+
+Una grabación de 40 minutos trae unos 2 400 puntos. El script **la adelgaza
+solo**, a uno cada 60 metros: los servidores públicos de ruteo no aceptan más
+de 100 coordenadas, y de paso se va la maraña que deja el GPS cuando el camión
+está parado en un semáforo. Te dice cuántos puntos quedaron.
+
+Después deja `metodo` en `"match"`: una traza real pegada a calles queda
+excelente, porque el emparejador fue diseñado exactamente para esto. Si el GPS
+se perdió en un tramo —bajo un puente, entre edificios altos— lo vas a ver en
+el mapa, y ahí sí vale cambiar a `"crudo"` o regrabar ese pedazo.
+
+> **La grabación no vuelve verificada la ruta por sí sola.** `published` pide
+> que alguien confirme que el recorrido es el de siempre y no el desvío de ese
+> día por una obra. Tú ibas a bordo: tú decides.
 
 ## Los tres métodos
 
 En `ruta.json`, el campo `metodo` decide qué se hace con tus puntos:
 
-| `metodo` | Qué hace | Cuándo usarlo |
-|---|---|---|
-| `"match"` *(por omisión)* | Pregunta **por qué calles pasó tu línea**, penalizando desvíos | Siempre, de entrada |
-| `"crudo"` | Usa tu línea tal cual, sin tocar ningún motor | Cuando el motor se empeña en equivocarse, o para ver algo ya |
-| `"ruta"` | Planea el camino más rápido entre tus puntos | Casi nunca. Inventa desvíos por avenidas |
+| `metodo`                  | Qué hace                                                       | Cuándo usarlo                                                |
+| ------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
+| `"match"` _(por omisión)_ | Pregunta **por qué calles pasó tu línea**, penalizando desvíos | Siempre, de entrada                                          |
+| `"crudo"`                 | Usa tu línea tal cual, sin tocar ningún motor                  | Cuando el motor se empeña en equivocarse, o para ver algo ya |
+| `"ruta"`                  | Planea el camino más rápido entre tus puntos                   | Casi nunca. Inventa desvíos por avenidas                     |
 
 **La diferencia entre `match` y `ruta` es la pregunta que se hace.** `ruta`
 responde «cómo llego de A a B más rápido en coche»: por eso se va por la

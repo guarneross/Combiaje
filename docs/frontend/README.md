@@ -24,14 +24,14 @@ QA la vean sin clonar el repo.
 
 Hito 1 — «La primera ruta vive en producción».
 
-| #   | Bloque                                            | Estado       |
-| --- | ------------------------------------------------- | ------------ |
-| 1   | Andamiaje                                         | ✅ hecho     |
-| 2   | Capa de datos (cliente HTTP, TanStack Query, MSW) | ✅ hecho     |
-| 3   | `<CombiajeMap>`                                   | ✅ hecho     |
-| 4   | Pantalla `/` con buscador y «rutas cerca de mí»   | ✅ hecho     |
-| 5   | `/rutas` y `/rutas/[slug]`                        | ✅ hecho     |
-| 6   | Pruebas con Vitest                                | ⬜ pendiente |
+| #   | Bloque                                            | Estado   |
+| --- | ------------------------------------------------- | -------- |
+| 1   | Andamiaje                                         | ✅ hecho |
+| 2   | Capa de datos (cliente HTTP, TanStack Query, MSW) | ✅ hecho |
+| 3   | `<CombiajeMap>`                                   | ✅ hecho |
+| 4   | Pantalla `/` con buscador y «rutas cerca de mí»   | ✅ hecho |
+| 5   | `/rutas` y `/rutas/[slug]`                        | ✅ hecho |
+| 6   | Pruebas con Vitest                                | ✅ hecho |
 
 ---
 
@@ -84,7 +84,7 @@ Todos se corren desde la raíz del repo; Turborepo los reparte.
 | `pnpm build`     | Build de producción                                                             |
 | `pnpm lint`      | ESLint. **No corre dentro de `next build`**: en Next 16 desapareció `next lint` |
 | `pnpm typecheck` | `tsc --noEmit`                                                                  |
-| `pnpm test`      | Vitest (desde el bloque 6)                                                      |
+| `pnpm test`      | Vitest, una pasada. Ver `02-convenciones.md` §9                                 |
 | `pnpm format`    | Prettier sobre todo el repo                                                     |
 
 ---

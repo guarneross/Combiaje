@@ -7,6 +7,64 @@ La historia larga de cada bloque está en `docs/frontend/` y en el proyecto.
 
 ---
 
+## 2026-10-08 · Bloque 6: pruebas
+
+Hito 1 cerrado. 24 pruebas con Vitest y Testing Library, en tres archivos:
+«rutas cerca de mí», el buscador y el cliente HTTP.
+
+- Se prueban **los cuatro desenlaces** de cada pantalla —con datos, vacío,
+  error de la API, y error de ubicación— y las decisiones que tomamos a
+  propósito: el mínimo de dos letras, no ofrecer «reintentar» cuando negaron
+  el permiso, y **encontrar una ruta por su número anterior**, que es el plus
+  de la renumeración.
+- Las respuestas salen de MSW, los mismos handlers de desarrollo, así que se
+  prueba la aplicación hablando con el contrato de verdad: pasa por Zod y por
+  `ApiError`. El cliente HTTP tiene su propia tanda, incluida la que rechaza
+  un 200 cuya forma no cumple el contrato. Esa es la que va a avisar el día
+  que el backend real devuelva algo distinto de lo acordado.
+- **Las pruebas traen sus propios datos** (`src/pruebas/datos.ts`), no los de
+  `mocks/data/puebla.ts`: ese archivo cambia con cada ruta que tracemos, y una
+  prueba que afirme «hay tres resultados» empezaría a fallar sola.
+- Comprobado que sirven: con `MINIMO_BUSQUEDA` en 1 y el botón de reintentar
+  siempre visible, fallaron exactamente las dos pruebas que debían.
+
+Las convenciones quedaron en `docs/frontend/02-convenciones.md` §9.
+
+**Sigue:** trazar la vuelta de la Ruta 21, y grabar alguna a bordo con el
+soporte de GPX. Y cambiar la contraseña de MySQL del POS.
+
+## 2026-10-06 · 🚀 Primer despliegue: Combiaje está en línea
+
+**https://combiaje.joscian.com** — la Ruta 21, trazada a mano de memoria, viva
+en internet. Hostinger, Node 22, aplicación aparte del sitio principal.
+`joscian.com` y el POS no sufrieron ni un segundo de interrupción.
+
+Tres cosas que rompieron y cómo se arreglaron, en orden:
+
+1. **Turbopack no compila en hosting compartido.** Revienta al procesar
+   `maplibre-gl.css` con PostCSS: necesita lanzar un proceso de Node aparte y
+   el plan no se lo permite. El build de producción usa `--webpack`, aquí y en
+   el servidor, para que sea el mismo en los dos lados.
+2. **Next no copia `public/` ni `.next/static/` dentro de `standalone`.** Ahora
+   lo hace `scripts/preparar-standalone.mjs` al final de cada build.
+3. **MSW tiraba el servidor entero.** `@mswjs/interceptors` lee un `.wasm` que
+   al empaquetarse quedó con la ruta absoluta de la carpeta de compilación;
+   Hostinger publica en otra carpeta, el archivo no estaba, y todo el sitio
+   respondía 500. Se arregla con `serverExternalPackages` en `next.config.ts`.
+   La prueba que lo detecta antes de desplegar —copiar `standalone` a otra ruta
+   y arrancarlo desde ahí— quedó escrita en `docs/despliegue.md`.
+
+Sobre el servidor, lo que encontramos: **todo `joscian.com` ya era una
+aplicación Express con Passenger** (el POS es una ruta dentro de ella), así que
+el aislamiento se logró con un sitio aparte, con su propio proceso y su propia
+versión de Node. Nunca se tocó el `.htaccess` del dominio principal.
+
+**Pendiente urgente, no de código**: la contraseña de MySQL del POS está
+escrita en `ecosystem.config.js` y se compartió en un chat. Cambiarla en
+horario de cierre, actualizar el archivo y reiniciar la aplicación.
+
+**Sigue:** bloque 6 (pruebas con Vitest) y trazar la vuelta de la Ruta 21.
+
 ## 2026-10-06 · Bloque 5: catálogo y ficha de ruta
 
 - `/rutas` con búsqueda y filtro por concesionaria (ambos en la URL), y
@@ -56,7 +114,8 @@ La historia larga de cada bloque está en `docs/frontend/` y en el proyecto.
 
 ## Pendientes que no son de código
 
-- [ ] Primer despliegue en `combiaje.joscian.com`.
-- [ ] Inicializar git y subir a GitHub.
+- [x] ~~Primer despliegue en `combiaje.joscian.com`~~ — 6 de octubre de 2026.
+- [x] ~~Inicializar git y subir a GitHub.~~
+- [ ] **Cambiar la contraseña de MySQL del POS** (está en `ecosystem.config.js`).
 - [ ] Grabar la primera ruta completa, ida y vuelta, con GPX.
 - [ ] Decidir si se registra un dominio propio.
