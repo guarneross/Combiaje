@@ -14,7 +14,7 @@
  *   3. Guarda el resultado en caché para no volver a pedirlo si no cambiaste
  *      nada.
  *
- * Al final escribe `apps/web/src/mocks/data/rutas-reales.json`. Si ese archivo
+ * Al final escribe `apps/web/src/datos/rutas-reales.json`. Si ese archivo
  * tiene rutas, la aplicación las usa **en lugar** de las simuladas.
  *
  * Uso:  pnpm rutas
@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ORIGEN = path.join(RAIZ, "data", "rutas");
-const DESTINO = path.join(RAIZ, "apps", "web", "src", "mocks", "data", "rutas-reales.json");
+const DESTINO = path.join(RAIZ, "apps", "web", "src", "datos", "rutas-reales.json");
 
 /**
  * Motor de ruteo. El servidor público de OSRM sirve para desarrollo: su

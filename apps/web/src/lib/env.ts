@@ -33,6 +33,18 @@ const schema = z.object({
    * las rutas simuladas. Ver `components/map/use-routes-source.ts`.
    */
   NEXT_PUBLIC_ROUTES_PMTILES_URL: z.string().default(""),
+
+  /**
+   * Supabase: solo las dos claves públicas. La contraseña de la base y la
+   * llave de servicio NO existen en este proyecto, a propósito — ver
+   * `src/server/supabase.ts`.
+   *
+   * Vacías por omisión: sin base de datos la aplicación funciona completa
+   * menos las calificaciones, y eso tiene que seguir siendo así para poder
+   * desarrollar sin depender de un servicio.
+   */
+  NEXT_PUBLIC_SUPABASE_URL: z.string().default(""),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().default(""),
 });
 
 const parsed = schema.safeParse({
@@ -42,6 +54,8 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_MAP_STYLE_URL: process.env.NEXT_PUBLIC_MAP_STYLE_URL,
   NEXT_PUBLIC_MAP_STYLE_URL_DARK: process.env.NEXT_PUBLIC_MAP_STYLE_URL_DARK,
   NEXT_PUBLIC_ROUTES_PMTILES_URL: process.env.NEXT_PUBLIC_ROUTES_PMTILES_URL,
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 });
 
 if (!parsed.success) {

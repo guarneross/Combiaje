@@ -1,17 +1,34 @@
-import { NEARBY_DEFAULT_LIMIT, NEARBY_DEFAULT_RADIUS_M, PAGE_DEFAULT_LIMIT } from "@combiaje/shared";
 import { delay, http, HttpResponse } from "msw";
 
+import {
+  buscarRutas,
+  concesionarias,
+  geojsonDeRuta,
+  paradasEn,
+  planearViaje,
+  rutaPorSlug,
+  rutasCercanas,
+} from "@/datos/consultas";
 import { API_BASE } from "@/lib/env";
 
-import { CONCESIONARIAS_ACTIVAS, PARADAS, RUTAS, RUTAS_RESUMEN } from "./data/puebla";
-import { distanciaATrazo, recuadroDe, type Posicion } from "./geo";
 import { escenarioActual, retrasoMs } from "./scenarios";
 
 /**
  * Handlers de MSW para el contrato de API v1.
  *
- * Solo endpoints que existen en el contrato. Si falta uno aquí es porque no
- * está en el contrato, y agregarlo requiere pasar por Arquitectura.
+ * **Son envoltorios, no una segunda implementación.** Desde el bloque 7 la
+ * lógica vive en `@/datos/consultas` y la usan los dos: estos handlers y los
+ * Route Handlers que sirven la API de verdad. Tenerla escrita dos veces es
+ * cómo se consigue que la aplicación se comporte distinto en desarrollo y en
+ * producción, y que una prueba en verde no signifique nada.
+ *
+ * Lo único que estos agregan es lo que el servidor real no debe tener: los
+ * escenarios de falla (`?simular=vacio|error|lento`), para poder construir y
+ * *ver* los tres estados obligatorios.
+ *
+ * Las calificaciones **no están aquí a propósito**: viven en Postgres y las
+ * sirve su Route Handler. Una petición a `/ratings` pasa de largo y llega al
+ * servidor de verdad, también en desarrollo.
  */
 
 const u = (ruta: string) => `${API_BASE}${ruta}`;
@@ -33,11 +50,7 @@ async function compuerta(): Promise<Response | null> {
   return null;
 }
 
-const normalizar = (texto: string) =>
-  texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+const vacio = () => escenarioActual() === "vacio";
 
 export const handlers = [
   // ---------------------------------------------------------------- catálogo
@@ -45,96 +58,50 @@ export const handlers = [
     const fallo = await compuerta();
     if (fallo) return fallo;
 
-    const params = new URL(request.url).searchParams;
-    const q = params.get("q");
-    const agency = params.get("agency");
-    const page = Number(params.get("page") ?? 1);
-    const limit = Number(params.get("limit") ?? PAGE_DEFAULT_LIMIT);
-
-    let encontradas = escenarioActual() === "vacio" ? [] : RUTAS_RESUMEN;
-
-    if (q) {
-      const aguja = normalizar(q);
-      encontradas = encontradas.filter(
-        (r) =>
-          normalizar(r.shortName).includes(aguja) ||
-          normalizar(r.longName).includes(aguja) ||
-          normalizar(r.agency?.shortName ?? "").includes(aguja) ||
-          // Por el número viejo también: durante la renumeración de la SMT,
-          // quien escribe «38A» tiene que encontrar la que hoy es 061.
-          (r.denominations ?? []).some((d) => normalizar(d.shortName).includes(aguja)),
-      );
-    }
-    if (agency) {
-      encontradas = encontradas.filter((r) => r.agency?.id === agency || r.agency?.shortName === agency);
-    }
-
-    const total = encontradas.length;
-    const desde = (page - 1) * limit;
-
-    return HttpResponse.json({
-      items: encontradas.slice(desde, desde + limit),
-      page,
-      limit,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
+    const p = new URL(request.url).searchParams;
+    const resultado = buscarRutas({
+      q: p.get("q"),
+      agency: p.get("agency"),
+      page: Number(p.get("page") ?? 1),
+      limit: Number(p.get("limit") ?? 0) || undefined,
     });
+
+    if (vacio()) return HttpResponse.json({ ...resultado, items: [], total: 0, totalPages: 1 });
+    return HttpResponse.json(resultado);
   }),
 
   http.get(u("/routes/:slug"), async ({ params }) => {
     const fallo = await compuerta();
     if (fallo) return fallo;
 
-    const ruta = RUTAS.find((r) => r.slug === params["slug"]);
-    if (!ruta) return problem(404, "Esa ruta no existe", `No hay ninguna ruta con el identificador ${String(params["slug"])}`);
-
-    const { geometrias: _geometrias, ...detalle } = ruta;
-    return HttpResponse.json(detalle);
+    const slug = String(params["slug"]);
+    const ruta = rutaPorSlug(slug);
+    if (!ruta) {
+      return problem(404, "Esa ruta no existe", `No hay ninguna ruta con el identificador ${slug}`);
+    }
+    return HttpResponse.json(ruta);
   }),
 
   http.get(u("/routes/:slug/geojson"), async ({ params }) => {
     const fallo = await compuerta();
     if (fallo) return fallo;
 
-    const ruta = RUTAS.find((r) => r.slug === params["slug"]);
-    if (!ruta) return problem(404, "Esa ruta no existe");
-
-    return HttpResponse.json({
-      type: "FeatureCollection",
-      bbox: recuadroDe(ruta.geometrias as Posicion[][]),
-      features: ruta.variants.map((variante, i) => ({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: ruta.geometrias[i] },
-        properties: {
-          variantId: variante.id,
-          routeId: ruta.id,
-          name: variante.name,
-          direction: variante.direction,
-          color: ruta.color,
-          isPrimary: variante.isPrimary,
-        },
-      })),
-    });
+    const geojson = geojsonDeRuta(String(params["slug"]));
+    if (!geojson) return problem(404, "Esa ruta no existe");
+    return HttpResponse.json(geojson);
   }),
 
   http.get(u("/agencies"), async () => {
     const fallo = await compuerta();
     if (fallo) return fallo;
-    return HttpResponse.json(escenarioActual() === "vacio" ? [] : CONCESIONARIAS_ACTIVAS);
+    return HttpResponse.json(vacio() ? [] : concesionarias());
   }),
 
   http.get(u("/stops"), async ({ request }) => {
     const fallo = await compuerta();
     if (fallo) return fallo;
-
-    const bbox = new URL(request.url).searchParams.get("bbox");
-    if (escenarioActual() === "vacio") return HttpResponse.json([]);
-    if (!bbox) return HttpResponse.json(PARADAS);
-
-    const [oeste, sur, este, norte] = bbox.split(",").map(Number) as [number, number, number, number];
-    return HttpResponse.json(
-      PARADAS.filter((p) => p.lng >= oeste && p.lng <= este && p.lat >= sur && p.lat <= norte),
-    );
+    if (vacio()) return HttpResponse.json([]);
+    return HttpResponse.json(paradasEn(new URL(request.url).searchParams.get("bbox")));
   }),
 
   // ------------------------------------------------------------------ cercanas
@@ -142,35 +109,25 @@ export const handlers = [
     const fallo = await compuerta();
     if (fallo) return fallo;
 
-    const params = new URL(request.url).searchParams;
-    const lat = Number(params.get("lat"));
-    const lng = Number(params.get("lng"));
-    const radio = Number(params.get("radius") ?? NEARBY_DEFAULT_RADIUS_M);
-    const limite = Number(params.get("limit") ?? NEARBY_DEFAULT_LIMIT);
+    const p = new URL(request.url).searchParams;
+    const lat = Number(p.get("lat"));
+    const lng = Number(p.get("lng"));
+    const radio = Number(p.get("radius") ?? 0) || undefined;
+    const limite = Number(p.get("limit") ?? 0) || undefined;
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return problem(422, "Faltan las coordenadas", "lat y lng son obligatorios y deben ser números");
+      return problem(422, "Faltan las coordenadas", "lat y lng son obligatorios y numéricos");
     }
-    if (escenarioActual() === "vacio") {
-      return HttpResponse.json({ routes: [], radiusM: radio });
-    }
+    if (vacio()) return HttpResponse.json({ routes: [], radiusM: radio ?? 500 });
 
-    const punto: Posicion = [lng, lat];
-    const cercanas = RUTAS.map((ruta) => ({
-      id: ruta.id,
-      slug: ruta.slug,
-      shortName: ruta.shortName,
-      longName: ruta.longName,
-      color: ruta.color,
-      distanceM: Math.round(
-        Math.min(...ruta.geometrias.map((g) => distanciaATrazo(punto, g as Posicion[]))),
-      ),
-    }))
-      .filter((r) => r.distanceM <= radio)
-      .sort((a, b) => a.distanceM - b.distanceM)
-      .slice(0, limite);
-
-    return HttpResponse.json({ routes: cercanas, radiusM: radio });
+    return HttpResponse.json(
+      rutasCercanas({
+        lat,
+        lng,
+        ...(radio ? { radius: radio } : {}),
+        ...(limite ? { limit: limite } : {}),
+      }),
+    );
   }),
 
   // --------------------------------------------------------------- planificador
@@ -183,51 +140,15 @@ export const handlers = [
       destination?: { lat: number; lng: number };
       maxWalkM?: number;
     };
-    const origen = cuerpo.origin;
-    const destino = cuerpo.destination;
-    if (!origen || !destino) return problem(422, "Faltan origen o destino");
+    if (!cuerpo.origin || !cuerpo.destination) return problem(422, "Faltan origen o destino");
 
-    const maxCaminata = cuerpo.maxWalkM ?? 800;
-    if (escenarioActual() === "vacio") {
-      return HttpResponse.json({
-        options: [],
-        meta: { maxWalkM: maxCaminata, generatedAt: new Date().toISOString() },
-      });
-    }
-
-    // Una ruta sirve si pasa cerca del origen y del destino. El sentido
-    // (ST_LineLocatePoint) lo valida el backend real; aquí no hace falta.
-    const opciones = RUTAS.map((ruta) => {
-      const trazo = ruta.geometrias[0] as Posicion[];
-      const aOrigen = distanciaATrazo([origen.lng, origen.lat], trazo);
-      const aDestino = distanciaATrazo([destino.lng, destino.lat], trazo);
-      return { ruta, aOrigen, aDestino };
-    })
-      .filter((c) => c.aOrigen <= maxCaminata && c.aDestino <= maxCaminata)
-      .sort((a, b) => a.aOrigen + a.aDestino - (b.aOrigen + b.aDestino))
-      .slice(0, 3)
-      .map(({ ruta, aOrigen, aDestino }) => ({
-        type: "direct" as const,
-        totalWalkM: Math.round(aOrigen + aDestino),
-        legs: [
-          { mode: "walk" as const, distanceM: Math.round(aOrigen) },
-          {
-            mode: "bus" as const,
-            routeId: ruta.id,
-            routeShortName: ruta.shortName,
-            color: ruta.color,
-            variantId: ruta.variants[0]!.id,
-            boardAt: { lat: origen.lat, lng: origen.lng, name: "Parada más cercana al origen" },
-            alightAt: { lat: destino.lat, lng: destino.lng, name: "Parada más cercana al destino" },
-            onboardDistanceM: Math.round(ruta.variants[0]!.lengthM * 0.4),
-          },
-          { mode: "walk" as const, distanceM: Math.round(aDestino) },
-        ],
-      }));
-
-    return HttpResponse.json({
-      options: opciones,
-      meta: { maxWalkM: maxCaminata, generatedAt: new Date().toISOString() },
+    const plan = planearViaje({
+      origin: cuerpo.origin,
+      destination: cuerpo.destination,
+      ...(cuerpo.maxWalkM ? { maxWalkM: cuerpo.maxWalkM } : {}),
     });
+
+    if (vacio()) return HttpResponse.json({ ...plan, options: [] });
+    return HttpResponse.json(plan);
   }),
 ];

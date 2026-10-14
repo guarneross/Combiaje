@@ -25,6 +25,7 @@ export * from "./agency";
 export * from "./route";
 export * from "./stop";
 export * from "./nearby";
+export * from "./rating";
 export * from "./trip-plan";
 export * from "./geojson";
 export * from "./constants";
