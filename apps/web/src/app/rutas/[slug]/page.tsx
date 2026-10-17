@@ -79,10 +79,15 @@ export default async function RutaPage({ params }: { params: Promise<{ slug: str
       />
 
       {/* En móvil, fijo bajo la barra: es lo que se vino a ver, y no se va
-          con el scroll. En escritorio ocupa toda la columna derecha. */}
+          con el scroll. En escritorio ocupa toda la columna derecha.
+
+          Mide 40dvh y no 13rem: una franja de 208 px no alcanza para seguir
+          un recorrido de diez kilómetros, y el botón de ampliar lo lleva a
+          pantalla completa cuando hace falta de verdad. */}
       <RouteMapPanel
         slug={ruta.slug}
-        className="h-52 w-full shrink-0 border-b lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-auto lg:border-b-0 lg:border-l"
+        expandible
+        className="h-[40dvh] w-full shrink-0 border-b lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-auto lg:border-b-0 lg:border-l"
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto lg:col-start-1 lg:row-start-2">

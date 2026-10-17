@@ -1,4 +1,4 @@
-import type { NearbyRoute, RouteSummary } from "@combiaje/shared";
+import type { NearbyRoute, RouteSummary, Stop } from "@combiaje/shared";
 
 /**
  * Datos de prueba, con la forma exacta del contrato de API v1.
@@ -75,6 +75,18 @@ export function cercana(parcial: Partial<NearbyRoute> = {}): NearbyRoute {
     longName: "Canal – Rincón",
     color: "#E11D48",
     distanceM: 120,
+    ...parcial,
+  };
+}
+
+/** Un lugar de los que hoy sirven de destino: terminales y referencias. */
+export function parada(parcial: Partial<Stop> = {}): Stop {
+  return {
+    id: "44444444-4444-4444-8444-444444444444",
+    name: "CAPU",
+    kind: "terminal",
+    lat: 19.0747,
+    lng: -98.2073,
     ...parcial,
   };
 }

@@ -7,6 +7,78 @@ La historia larga de cada bloque está en `docs/frontend/` y en el proyecto.
 
 ---
 
+## 2026-10-15 · La pantalla principal deja de ser un mapa de todo
+
+El detonante: con dos rutas trazadas (Canal y Josefina Aparicio), la pantalla
+abría pintando las cuatro líneas —ida y vuelta de cada una— encima del centro.
+Un nudo. Con diez rutas habría sido ilegible, y el problema no era de dibujo:
+era que la pantalla contestaba una pregunta que nadie hizo.
+
+- **Ahora pregunta.** «¿A dónde quieres ir?» arriba, mapa limpio detrás. El
+  mismo cuadro busca lugares y rutas: quien escribe «Zócalo» quiere llegar,
+  quien escribe «21» quiere ver esa ruta.
+- **Los trazos son la respuesta**, no el fondo. `<CombiajeMap>` recibe
+  `rutasVisibles` y solo descarga la geometría de lo que esa lista pide.
+- **La red completa sigue existiendo**, en `/rutas`, que es donde se entra a
+  propósito para ver todo. Un solo sentido; la ficha es la única pantalla con
+  ida y vuelta juntas.
+- **Desfase por ruta** (`line-offset`): dos trazos sobre la misma avenida ya no
+  se tapan, y ida y vuelta caen cada una a su lado de la calle.
+- **Arreglado el orden origen → destino** en `/trip-plan`. Antes proponía la
+  ida y la vuelta de la misma ruta como dos opciones y una te llevaba al lado
+  contrario. La distancia a bordo ya no es un porcentaje inventado del largo
+  total, son los metros entre donde subes y donde bajas.
+- Un error del mapa deja de ser fatal en cuanto el mapa cargó.
+- 48 pruebas (eran 37). Las nuevas del planificador corren sobre una avenida
+  inventada: la regla del orden no se puede afirmar sobre un dataset que
+  cambia cada vez que subes una ruta.
+
+### Y dos arreglos de lo mismo, al verlo en la calle
+
+Con dos rutas reales encima del Boulevard Héroes del 5 de Mayo, a zoom de
+calle los trazos salían **despegados de la avenida**. El desfase crecía con el
+zoom, igual que el grosor, y a zoom 18 eran veinte píxeles.
+
+Ahora se encoge al acercarse. De lejos la pregunta es «¿cuántas rutas pasan
+por aquí?» y la separación hace falta; de cerca es «¿baja por mi calle?» y lo
+que hace falta es precisión. El medio carril que separa ida de vuelta sí es
+constante: dos píxeles caben en cualquier calle.
+
+Ojo: lo que quede fuera de la calle después de esto **es el trazo**, no el
+dibujo. Son líneas a mano; se arreglan grabando la ruta en GPX.
+
+Y en el teléfono, la ficha de ruta: el mapa medía 208 px —una franja inútil
+para seguir diez kilómetros— y no se podía agrandar. Ahora mide 40dvh y tiene
+botón de **ampliar a pantalla completa**, con Escape para cerrar. El mapa
+observa su propio contenedor y se vuelve a encuadrar al cambiar de tamaño;
+MapLibre solo escucha el `resize` de la ventana, y ampliar no cambia la
+ventana.
+
+**Sigue:** tocar un punto del mapa → «qué pasa por aquí».
+
+### Y el mismo día, el geocodificador
+
+Ya se puede escribir una calle o una colonia, no solo las doce terminales del
+dataset. `GET /geocode?q=` junta nuestras paradas con **Photon** (el buscador
+de komoot sobre OpenStreetMap: gratuito, sin llave, ODbL).
+
+- **Pasa por nuestro servidor**, no por el navegador: si no, lo que teclea
+  cada persona y su IP se irían a un tercero letra por letra.
+- **Antirrebote de 350 ms y tres letras mínimo.** Escribir «angelópolis» es
+  una consulta, no once.
+- **Si Photon no contesta, no pasa nada grave:** 200 con los lugares propios y
+  `partial: true`, y la pantalla lo dice.
+- Recorta al área metropolitana, ordena colonia > calle > negocio, quita
+  duplicados. Lo que se busca **no se registra en ningún log**.
+- `PHOTON_URL` cambia el proveedor sin tocar código.
+- **`NEXT_PUBLIC_API_URL` ahora apunta a `localhost:3000`**, no a 3001. Era de
+  cuando el backend iba a ser un proceso aparte; con los mocks encendidos daba
+  igual, pero todo lo que MSW no simula —calificaciones y geocodificador— se
+  iba a un puerto donde no hay nadie. **Cámbialo también en tu `.env.local`.**
+
+57 pruebas. Photon no se simula en los handlers de desarrollo, igual que las
+calificaciones: lo que está detrás de un servicio externo pasa de largo.
+
 ## 2026-10-08 · Bloque 6: pruebas
 
 Hito 1 cerrado. 24 pruebas con Vitest y Testing Library, en tres archivos:

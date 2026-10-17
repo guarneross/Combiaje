@@ -1,5 +1,6 @@
 import {
   agencySchema,
+  geocodeResponseSchema,
   nearbyResponseSchema,
   paginatedSchema,
   routeDetailSchema,
@@ -87,6 +88,26 @@ export function obtenerRutasCercanas(
       radius: args.radius,
       limit: args.limit,
     },
+  });
+}
+
+/**
+ * `GET /geocode?q=`
+ *
+ * No está en el contrato v1 del plan maestro; se agregó para poder contestar
+ * «¿a dónde quieres ir?» con algo más que las terminales del dataset. Ver
+ * `packages/shared/src/geocode.ts` y `src/server/geocodificador.ts`.
+ *
+ * Lo que se escribe aquí **no se registra en ningún lado**, ni en el cliente
+ * ni en el servidor.
+ */
+export function buscarLugares(
+  args: { q: string; limit?: number },
+  opciones?: OpcionesPeticion,
+) {
+  return api.get("/geocode", geocodeResponseSchema, {
+    ...opciones,
+    params: { q: args.q, limit: args.limit },
   });
 }
 

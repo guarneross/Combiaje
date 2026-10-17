@@ -250,6 +250,77 @@ Además el mapa **recorta** el relleno a lo que cabe en su contenedor. Sin eso,
 heredar los 280 px de la pantalla principal en un mapa de 208 px de alto dejaba
 la ruta diminuta y fuera de cuadro: MapLibre no valida que el relleno quepa.
 
+### El mapa no decide qué dibuja: la pantalla sí
+
+`<CombiajeMap>` recibe `rutasVisibles`, una lista de slugs. `[]` deja el mapa
+limpio, `null` dibuja todas. El mapa solo descarga la geometría de lo que esa
+lista pide.
+
+Antes no existía: el mapa montaba, pedía el GeoJSON de **todo el catálogo** y lo
+pintaba, ida y vuelta de cada ruta. Con dos rutas trazadas la pantalla
+principal ya abría con un nudo encima del centro que no contestaba ninguna
+pregunta; con veinte habría sido ilegible, y además eran veinte descargas que
+nadie pidió.
+
+De ahí salen tres reglas:
+
+| Pantalla | Qué dibuja | Sentido |
+|---|---|---|
+| Principal (`/`) | nada al abrir; después, las rutas que te llevan a tu destino, o la que elegiste | solo ida |
+| Catálogo (`/rutas`) | la red completa — es la vista de «ver todo», a la que se entra a propósito | solo ida |
+| Ficha (`/rutas/[slug]`) | esa ruta y ninguna más | ida y vuelta |
+
+**Un solo sentido por omisión.** Ida y vuelta recorren casi las mismas calles:
+pintar las dos duplica cada línea y no dice nada nuevo. La única pantalla donde
+las dos juntas tienen sentido es la ficha, porque ahí el recorrido *es* el tema.
+
+### Desfase: por qué dos rutas en la misma avenida se ven
+
+En Puebla casi todo pasa por el centro. Dos trazos sobre la misma calle se
+tapan, y el de arriba hace desaparecer al de abajo. `desfasesPara()` reparte un
+`line-offset` alternando a izquierda y derecha desde el eje, más medio carril
+fijo que manda ida y vuelta a lados opuestos —la geometría de la vuelta va al
+revés, así que un desfase constante las separa solo—.
+
+**El desfase se encoge al acercarse**, al revés que el grosor. A cada zoom se
+hace una pregunta distinta: de lejos, «¿cuántas rutas pasan por aquí?» —y si
+dos trazos se encinan, la respuesta parece «una»—; de cerca, «¿este camión baja
+por mi calle?», y ahí un trazo diez píxeles al lado de la avenida es
+simplemente un trazo mal dibujado. Así que la separación entre rutas va
+completa a zoom de ciudad y se desvanece a un 10 % a nivel de calle. El medio
+carril que separa ida de vuelta sí es constante: dos píxeles caben en cualquier
+calle. La primera versión lo hacía al revés —el desfase crecía con el zoom,
+como el grosor— y a zoom 18 las rutas salían despegadas del bulevar.
+
+Dos límites más que conviene conocer:
+
+- `line-offset` deforma el trazo en las vueltas cerradas: la línea desplazada
+  se cruza consigo misma y se ve un manchón. El tamaño es proporcional al
+  desfase, y por eso el paso son 6 px y no 15.
+- **Las expresiones de zoom van arriba del todo.** MapLibre solo acepta
+  `["zoom"]` como entrada de un `interpolate` o `step` de primer nivel. Anidar
+  uno dentro de un `["*", …]` invalida la expresión, el estilo no carga y la
+  pantalla acaba enseñando «no pudimos cargar el mapa» con el mapa sano
+  detrás. Por eso existe `porZoom()` en `map-layers.ts`: escala el valor
+  *dentro* de cada parada de la interpolación.
+
+### El lienzo escucha a su contenedor, no a la ventana
+
+MapLibre solo atiende el `resize` de la ventana, y eso no cubre el caso que
+importa: en la ficha de ruta el mapa se amplía a pantalla completa sin que la
+ventana cambie de tamaño. `<CombiajeMap>` observa su propio contenedor con un
+`ResizeObserver`, llama a `resize()` y **vuelve a encuadrar**: con el doble de
+alto disponible, ampliar el mapa sin re-encuadrar solo agrega espacio vacío
+debajo de la ruta.
+
+### Un error de mapa deja de ser fatal en cuanto el mapa cargó
+
+`onError` tira la pantalla **solo** si el mapa nunca llegó a cargar. Después,
+un error es casi siempre una tesela que no respondió: cambiar a la pantalla de
+fallo por eso deja a alguien sin mapa teniendo uno usable enfrente. Y el
+cambio de estado va en un microtask, porque MapLibre avisa mientras React
+pinta las capas.
+
 ---
 
 ## 4. Decisiones del andamiaje

@@ -1,13 +1,20 @@
-import { NEARBY_DEFAULT_LIMIT, NEARBY_DEFAULT_RADIUS_M, type Bbox } from "@combiaje/shared";
+import {
+  NEARBY_DEFAULT_LIMIT,
+  NEARBY_DEFAULT_RADIUS_M,
+  type Bbox,
+  type Coordinates,
+} from "@combiaje/shared";
 import { queryOptions } from "@tanstack/react-query";
 
 import {
+  buscarLugares,
   obtenerConcesionarias,
   obtenerParadas,
   obtenerRuta,
   obtenerRutaGeoJson,
   obtenerRutas,
   obtenerRutasCercanas,
+  planearViaje as pedirPlan,
   type FiltrosRutas,
 } from "./endpoints";
 
@@ -35,6 +42,16 @@ export const claves = {
   paradas: (bbox: Bbox) => ["paradas", bbox] as const,
   cercanas: (lat: number, lng: number, radio: number) =>
     ["cercanas", { lat: redondearCoordenada(lat), lng: redondearCoordenada(lng), radio }] as const,
+  lugares: (q: string) => ["lugares", q.trim().toLowerCase()] as const,
+  plan: (origen: Coordinates, destino: Coordinates, maxCaminata: number) =>
+    [
+      "plan",
+      {
+        origen: [redondearCoordenada(origen.lng), redondearCoordenada(origen.lat)],
+        destino: [redondearCoordenada(destino.lng), redondearCoordenada(destino.lat)],
+        maxCaminata,
+      },
+    ] as const,
 } as const;
 
 /**
@@ -77,6 +94,56 @@ export const paradasQuery = (bbox: Bbox) =>
     queryFn: ({ signal }) => obtenerParadas(bbox, { signal }),
     staleTime: 30 * MINUTO,
   });
+
+/**
+ * `GET /geocode?q=`
+ *
+ * `staleTime` largo a propósito: dónde está una colonia no cambia, y cada
+ * respuesta que se reusa es una petición menos a un servicio gratuito ajeno.
+ * Quien escribe y borra la misma palabra no vuelve a pedir nada.
+ *
+ * **El antirrebote NO vive aquí**, vive en la pantalla: sin él, una consulta
+ * por cada tecla. Ver `use-debounce.ts`.
+ */
+export const lugaresQuery = (q: string) =>
+  queryOptions({
+    queryKey: claves.lugares(q),
+    queryFn: ({ signal }) => buscarLugares({ q: q.trim() }, { signal }),
+    staleTime: 30 * MINUTO,
+  });
+
+/**
+ * `POST /trip-plan`.
+ *
+ * Es un POST y aun así se consulta como una lectura: el cuerpo lleva dos
+ * coordenadas, no cambia nada del servidor, y la respuesta para el mismo par
+ * origen-destino es la misma. Tratarlo como mutación obligaría a disparar el
+ * plan a mano cada vez que cambia el destino, y a manejar su estado a mano.
+ *
+ * Las coordenadas se redondean en la clave por lo mismo que en `/nearby`: el
+ * GPS tiembla unos metros aunque el usuario esté quieto, y sin redondear cada
+ * lectura sería un plan nuevo.
+ */
+export const planQuery = (args: {
+  origen: Coordinates;
+  destino: Coordinates;
+  maxWalkM?: number;
+}) => {
+  const maxCaminata = args.maxWalkM ?? 800;
+  return queryOptions({
+    queryKey: claves.plan(args.origen, args.destino, maxCaminata),
+    queryFn: ({ signal }) =>
+      pedirPlan(
+        {
+          origin: { lat: redondearCoordenada(args.origen.lat), lng: redondearCoordenada(args.origen.lng) },
+          destination: args.destino,
+          maxWalkM: maxCaminata,
+        },
+        { signal },
+      ),
+    staleTime: 5 * MINUTO,
+  });
+};
 
 export const cercanasQuery = (args: {
   lat: number;

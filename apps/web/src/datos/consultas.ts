@@ -6,11 +6,27 @@ import {
   type NearbyResponse,
   type RouteDetail,
   type RouteSummary,
+  STOP_KIND_LABEL,
+  type Place,
   type Stop,
+  type TripOption,
 } from "@combiaje/shared";
 
-import { CONCESIONARIAS_ACTIVAS, PARADAS, RUTAS, RUTAS_RESUMEN } from "./dataset";
-import { distanciaATrazo, recuadroDe, type Posicion } from "./geo";
+import {
+  CONCESIONARIAS_ACTIVAS,
+  PARADAS,
+  RUTAS,
+  RUTAS_RESUMEN,
+  type RutaSimulada,
+} from "./dataset";
+import {
+  distanciaATrazo,
+  distanciaEntre,
+  proyectarEnTrazo,
+  recuadroDe,
+  type Posicion,
+  type Proyeccion,
+} from "./geo";
 
 /**
  * Las consultas sobre el dataset de rutas, **sin HTTP de por medio**.
@@ -179,6 +195,34 @@ export function rutasCercanas(consulta: ConsultaCercanas): NearbyResponse {
   return { routes, radiusM: radio };
 }
 
+/**
+ * Los lugares que Combiaje conoce por su cuenta: sus propias paradas.
+ *
+ * Van **antes** que los del geocodificador externo en `GET /geocode`, por dos
+ * razones. Son los que tienen rutas encima, así que son los que de verdad
+ * sirven de destino; y no dependen de que nadie conteste, así que la caja de
+ * «¿a dónde vas?» nunca se queda completamente vacía porque un servicio de
+ * terceros se haya caído.
+ */
+export function lugaresPropios(texto: string, limite = 5): Place[] {
+  const aguja = normalizar(texto.trim());
+  if (!aguja) return [];
+
+  return PARADAS.filter((parada) => normalizar(parada.name).includes(aguja))
+    .slice(0, limite)
+    .map((parada) => ({
+      // Prefijo de fuente: los lugares de OpenStreetMap no son filas nuestras
+      // y sus identificadores no son UUID, así que el id es texto.
+      id: `combiaje:${parada.id}`,
+      name: parada.name,
+      context: STOP_KIND_LABEL[parada.kind],
+      lat: parada.lat,
+      lng: parada.lng,
+      kind: "stop" as const,
+      source: "combiaje" as const,
+    }));
+}
+
 export interface ConsultaViaje {
   origin: { lat: number; lng: number };
   destination: { lat: number; lng: number };
@@ -186,54 +230,141 @@ export interface ConsultaViaje {
 }
 
 /**
+ * Menos de esto a bordo y la respuesta honesta es «camina»: no vale la pena
+ * esperar un camión para avanzar tres cuadras, y una opción así desprestigia
+ * a todas las demás de la lista.
+ */
+const MINIMO_A_BORDO_M = 300;
+
+/** A cuántos metros una parada conocida sirve para nombrar un punto del trazo. */
+const RADIO_NOMBRE_M = 250;
+
+/**
+ * Cómo se le dice a un punto sobre el recorrido.
+ *
+ * Si hay una parada conocida al lado, se usa su nombre: «te subes en CAPU» es
+ * una instrucción; «te subes en 19.0747, -98.2073» no es nada. Si no hay
+ * ninguna cerca, se dice la verdad —que es un punto del recorrido— en lugar de
+ * inventar una parada que no existe.
+ */
+function nombrarPunto(punto: Posicion, respaldo: string): string {
+  let mejor: { nombre: string; distancia: number } | null = null;
+  for (const parada of PARADAS) {
+    const distancia = distanciaEntre(punto, [parada.lng, parada.lat]);
+    if (distancia <= RADIO_NOMBRE_M && (!mejor || distancia < mejor.distancia)) {
+      mejor = { nombre: parada.name, distancia };
+    }
+  }
+  return mejor?.nombre ?? respaldo;
+}
+
+interface Candidata {
+  ruta: RutaSimulada;
+  indiceVariante: number;
+  origen: Proyeccion;
+  destino: Proyeccion;
+}
+
+const caminataDe = (c: Candidata) => c.origen.distanciaM + c.destino.distanciaM;
+const aBordoDe = (c: Candidata) => c.destino.avanceM - c.origen.avanceM;
+
+function armarOpcion(candidata: Candidata): TripOption {
+  const { ruta, indiceVariante, origen, destino } = candidata;
+  const variante = ruta.variants[indiceVariante]!;
+
+  return {
+    type: "direct",
+    totalWalkM: Math.round(caminataDe(candidata)),
+    legs: [
+      { mode: "walk", distanceM: Math.round(origen.distanciaM) },
+      {
+        mode: "bus",
+        routeId: ruta.id,
+        routeSlug: ruta.slug,
+        routeShortName: ruta.shortName,
+        color: ruta.color,
+        variantId: variante.id,
+        variantName: variante.name,
+        boardAt: {
+          lat: origen.punto[1],
+          lng: origen.punto[0],
+          name: nombrarPunto(origen.punto, "Sobre el recorrido, cerca de ti"),
+        },
+        alightAt: {
+          lat: destino.punto[1],
+          lng: destino.punto[0],
+          name: nombrarPunto(destino.punto, "Lo más cerca que te deja"),
+        },
+        onboardDistanceM: Math.round(aBordoDe(candidata)),
+      },
+      { mode: "walk", distanceM: Math.round(destino.distanciaM) },
+    ],
+  };
+}
+
+/**
  * `POST /trip-plan`, solo viajes directos.
  *
- * Una ruta sirve si pasa cerca del origen **y** del destino. Falta validar que
- * los toque en ese orden —hoy puede proponer una ruta que pasa por el destino
- * antes que por el origen—; eso necesita proyectar los dos puntos sobre el
- * trazo y comparar sus posiciones, y es parte del hito S5. Hasta entonces, la
- * pantalla `/planear` sigue sin publicarse.
+ * Una ruta sirve si pasa cerca del origen, cerca del destino **y en ese
+ * orden**. Lo tercero es lo que antes faltaba: con solo las dos distancias,
+ * toda ruta que pasa por los dos puntos aparecía dos veces —ida y vuelta— y
+ * una de las dos te llevaba al lado opuesto. Por eso ahora cada punto se
+ * proyecta sobre el trazo con `proyectarEnTrazo`, que además de la distancia
+ * dice en qué kilómetro del recorrido cae, y se exige que el destino quede
+ * más adelante que el origen.
+ *
+ * De cada ruta sale **una sola** opción: la variante que de verdad te lleva.
+ * Y la distancia a bordo ya no es un porcentaje inventado del largo total,
+ * sino los metros que hay entre donde subes y donde bajas.
+ *
+ * Lo que sigue faltando: transbordos (una sola ruta tiene que servir para todo
+ * el viaje) y el tiempo, que necesita frecuencias y velocidades que nadie ha
+ * medido todavía. Por eso la respuesta habla de metros y no de minutos.
+ *
+ * `rutas` se puede pasar para probar la regla del orden sobre un trazo hecho a
+ * mano. En producción nadie lo pasa: el dataset real cambia cada vez que se
+ * sube una ruta, y una prueba que dependa de él se rompe sin que nada esté
+ * mal.
  */
-export function planearViaje(consulta: ConsultaViaje) {
+export function planearViaje(consulta: ConsultaViaje, rutas: readonly RutaSimulada[] = RUTAS) {
   const maxCaminata = consulta.maxWalkM ?? 800;
+  const origen: Posicion = [consulta.origin.lng, consulta.origin.lat];
+  const destino: Posicion = [consulta.destination.lng, consulta.destination.lat];
 
-  const options = RUTAS.map((ruta) => {
-    const trazo = ruta.geometrias[0] as Posicion[];
-    return {
-      ruta,
-      aOrigen: distanciaATrazo([consulta.origin.lng, consulta.origin.lat], trazo),
-      aDestino: distanciaATrazo([consulta.destination.lng, consulta.destination.lat], trazo),
-    };
-  })
-    .filter((c) => c.aOrigen <= maxCaminata && c.aDestino <= maxCaminata)
-    .sort((a, b) => a.aOrigen + a.aDestino - (b.aOrigen + b.aDestino))
-    .slice(0, 3)
-    .map(({ ruta, aOrigen, aDestino }) => ({
-      type: "direct" as const,
-      totalWalkM: Math.round(aOrigen + aDestino),
-      legs: [
-        { mode: "walk" as const, distanceM: Math.round(aOrigen) },
-        {
-          mode: "bus" as const,
-          routeId: ruta.id,
-          routeShortName: ruta.shortName,
-          color: ruta.color,
-          variantId: ruta.variants[0]!.id,
-          boardAt: {
-            lat: consulta.origin.lat,
-            lng: consulta.origin.lng,
-            name: "Parada más cercana al origen",
-          },
-          alightAt: {
-            lat: consulta.destination.lat,
-            lng: consulta.destination.lng,
-            name: "Parada más cercana al destino",
-          },
-          onboardDistanceM: Math.round(ruta.variants[0]!.lengthM * 0.4),
-        },
-        { mode: "walk" as const, distanceM: Math.round(aDestino) },
-      ],
-    }));
+  const candidatas: Candidata[] = [];
 
-  return { options, meta: { maxWalkM: maxCaminata, generatedAt: new Date().toISOString() } };
+  for (const ruta of rutas) {
+    let mejorDeLaRuta: Candidata | null = null;
+
+    for (let i = 0; i < ruta.variants.length; i++) {
+      const trazo = ruta.geometrias[i] as Posicion[] | undefined;
+      if (!trazo || trazo.length < 2) continue;
+
+      const candidata: Candidata = {
+        ruta,
+        indiceVariante: i,
+        origen: proyectarEnTrazo(origen, trazo),
+        destino: proyectarEnTrazo(destino, trazo),
+      };
+
+      if (candidata.origen.distanciaM > maxCaminata) continue;
+      if (candidata.destino.distanciaM > maxCaminata) continue;
+      if (aBordoDe(candidata) < MINIMO_A_BORDO_M) continue;
+
+      if (!mejorDeLaRuta || caminataDe(candidata) < caminataDe(mejorDeLaRuta)) {
+        mejorDeLaRuta = candidata;
+      }
+    }
+
+    if (mejorDeLaRuta) candidatas.push(mejorDeLaRuta);
+  }
+
+  // Primero la que menos te hace caminar; a igual caminata, la que menos te
+  // tiene arriba del camión.
+  candidatas.sort((a, b) => caminataDe(a) - caminataDe(b) || aBordoDe(a) - aBordoDe(b));
+
+  return {
+    options: candidatas.slice(0, 3).map(armarOpcion),
+    meta: { maxWalkM: maxCaminata, generatedAt: new Date().toISOString() },
+  };
 }

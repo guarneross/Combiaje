@@ -1,0 +1,32 @@
+{
+  "shortName": "21",
+  "longName": "6 de junio",
+  "color": "#D97706",
+  "textColor": "#FFFFFF",
+  "fareCents": null,
+  "status": "draft",
+  "dataSource": "manual",
+  "agency": {
+    "name": "Por identificar",
+    "shortName": null,
+    "type": "urbano"
+  },
+  "notas": "Trazada el 2026-10-16. PENDIENTE: tarifa, concesionaria, verificar en campo y trazar la vuelta.",
+  "metodo": "match",
+  "colorSecundario": null,
+  "cuenca": null,
+  "denominaciones": [
+    {
+      "shortName": "21",
+      "longName": "6 de junio",
+      "colores": [
+        "#D97706"
+      ],
+      "cuenca": null,
+      "desde": null,
+      "hasta": null,
+      "vigente": true,
+      "fuente": "nomenclatura anterior"
+    }
+  ]
+}

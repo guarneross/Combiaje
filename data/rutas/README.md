@@ -150,7 +150,7 @@ git push
 El push dispara el despliegue solo y en un par de minutos la ruta está en
 **combiaje.joscian.com**. No hay que tocar el panel de Hostinger.
 
-Lo que de verdad viaja es `apps/web/src/mocks/data/rutas-reales.json`, que
+Lo que de verdad viaja es `apps/web/src/datos/rutas-reales.json`, que
 genera `pnpm rutas`. **Si lo olvidas en el commit, la ruta no aparece en línea
 aunque se vea perfecta en tu máquina.** Por eso el `git add -A`.
 
