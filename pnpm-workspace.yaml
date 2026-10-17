@@ -1,3 +1,28 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Desde pnpm 11, los ajustes viven aquí y ya NO en el campo "pnpm" de
+# package.json. Se dejan en los dos lados a propósito mientras conviva la 10
+# (local) con la que traiga el servidor de Hostinger.
+onlyBuiltDependencies:
+  - unrs-resolver
+  - sharp
+  - esbuild
+  - msw
+
+# Por qué: Hostinger instala con pnpm 10.18.0 -la versión fijada en
+# "packageManager"- pero turbo lanza el build de cada paquete a través del
+# atajo de corepack, y ese atajo resuelve a la pnpm que trae el servidor
+# (hoy la 11.24). pnpm se niega a correr bajo corepack con una versión
+# distinta a la fijada, y el despliegue falla en cuatro segundos.
+#
+# Esa llamada anidada solo ejecuta un script -no instala nada-, así que la
+# versión da igual ahí. "warn" avisa y sigue; "ignore" callaría algo que sí
+# queremos ver el día que la diferencia importe.
+pmOnFail: warn
+
+# Y por lo mismo: esa pnpm ajena ve un node_modules instalado por otra versión,
+# decide que está desincronizado y quiere reinstalarlo —borrando la carpeta—
+# en medio del build. Avisar basta; quien instala es el paso anterior.
+verifyDepsBeforeRun: warn

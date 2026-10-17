@@ -54,6 +54,24 @@ observa su propio contenedor y se vuelve a encuadrar al cambiar de tamaño;
 MapLibre solo escucha el `resize` de la ventana, y ampliar no cambia la
 ventana.
 
+### 17 de octubre · el despliegue falló por la pnpm del servidor
+
+Primer push con todo esto dentro y el build murió a los cuatro segundos, sin
+que el código tuviera que ver. Hostinger **instala** con la pnpm fijada en
+`packageManager` (10.18.0), pero turbo lanza el build de cada paquete a
+través del atajo de corepack del servidor, que resuelve a la pnpm que el
+servidor trae de fábrica (hoy la 11.24). pnpm se niega a correr bajo corepack
+con una versión distinta a la fijada.
+
+Arreglado en `pnpm-workspace.yaml` con `pmOnFail: warn` y
+`verifyDepsBeforeRun: warn` — el segundo es el importante: sin él esa pnpm
+ajena quiere **borrar `node_modules`** y reinstalar en medio del build. Y
+`onlyBuiltDependencies` se mudó al mismo archivo, porque desde la pnpm 11 el
+campo `pnpm` de `package.json` ya no se lee.
+
+Reproducido en local poniendo esa misma pnpm en medio del build antes de
+subirlo. El detalle largo está en `docs/despliegue.md`.
+
 **Sigue:** tocar un punto del mapa → «qué pasa por aquí».
 
 ### Y el mismo día, el geocodificador

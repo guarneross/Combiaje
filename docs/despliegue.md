@@ -124,6 +124,43 @@ Lo que se sube es el contenido de `.next/standalone/`, y se arranca con:
 node apps/web/server.js      # respeta PORT y HOSTNAME
 ```
 
+### ⚠️ La pnpm del servidor no es la nuestra
+
+Un día el despliegue empezó a fallar a los cuatro segundos, sin que el código
+tuviera nada que ver:
+
+```
+[ERROR] Este proyecto está configurado para usar la versión 10.18.0 de pnpm.
+Su versión actual de pnpm es la v11.24.0
+Corepack invocó pnpm con esta versión, y pnpm no cambia de versión
+cuando se ejecuta bajo corepack.
+```
+
+Lo que pasa: Hostinger **instala** con la versión fijada en `packageManager`
+(10.18.0, la misma que en la máquina de desarrollo), pero después turbo lanza
+el build de cada paquete llamando a `pnpm run build`, y esa llamada pasa por
+el atajo de corepack del servidor, que resuelve a **la pnpm que el servidor
+trae de fábrica**. pnpm se niega a correr bajo corepack con una versión
+distinta a la fijada, y el build muere ahí.
+
+Hostinger puede actualizar su pnpm cuando quiera, así que fijarla a la de hoy
+solo aplaza el problema. La salida está en `pnpm-workspace.yaml`:
+
+| Ajuste | Qué hace |
+|---|---|
+| `pmOnFail: warn` | la diferencia de versión avisa en lugar de abortar. Esa llamada anidada **solo ejecuta un script, no instala nada**, así que ahí la versión da igual |
+| `verifyDepsBeforeRun: warn` | sin esto, la pnpm ajena ve un `node_modules` instalado por otra versión, lo declara desincronizado y quiere **borrar la carpeta** y reinstalar en medio del build |
+
+Las dos en `warn` y no en `ignore` a propósito: el día que la diferencia sí
+importe, queremos verla en el registro.
+
+Y de paso, `onlyBuiltDependencies` se mudó a `pnpm-workspace.yaml`: desde la
+pnpm 11 el campo `pnpm` de `package.json` ya no se lee. Queda en los dos
+lados mientras convivan las dos versiones.
+
+Reproducido antes de subirlo, con la pnpm del servidor puesta a propósito en
+medio del build: con el arreglo pasa, sin él falla igual que en Hostinger.
+
 ## La configuración exacta en hPanel
 
 Se crea con **Sitios web → Crear sitio web → Aplicación web**, eligiendo el
